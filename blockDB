@@ -1,0 +1,104 @@
+--An API to convert names that turtles get from inspect into human readable names, and back
+
+-- We initialize this with a local database, but ideally we'll update it from the web
+local NameDB = { 
+  [ "chisel:andesite:0" ] = "andesite",
+  [ "chisel:diorite:0" ] = "diorite",
+  [ "chisel:limestone:0" ] = "limestone",
+  [ "Forestry:resources:1" ] = "copper ore",
+  [ "Forestry:resources:2" ] = "tin ore",
+  [ "IC2:blockOreTin:0" ] = "tin ore",
+  [ "minecraft:air" ] = "air",
+  [ "minecraft:bedrock:0" ] = "bedrock",
+  [ "minecraft:coal_ore:0" ] = "coal ore",
+  [ "minecraft:cobblestone:0" ] = "cobblestone",
+  [ "minecraft:dirt:0" ] = "dirt",
+  [ "minecraft:gold_ore:0" ] = "gold ore",
+  [ "minecraft:grass:0" ] = "grass",
+  [ "minecraft:gravel:0" ] = "gravel",
+  [ "minecraft:iron_ore:0" ] = "iron ore",
+  [ "minecraft:sand:0" ] = "sand",
+  [ "minecraft:stone:0" ] = "stone",
+  [ "ProjRed|Exploration:projectred.exploration.ore:4" ] = "tin ore",
+  [ "TConstruct:ore.berries.two:13" ] = "essence berry bush",
+  [ "Thaumcraft:blockCustomOre:0" ] = "cinnabar ore",
+  [ "ThermalFoundation:Ore:1" ] = "tin ore",
+  [ "ThermalFoundation:Ore:2" ] = "silver ore",
+  [ "ThermalFoundation:Ore:3" ] = "lead ore",
+}
+
+-- Returns the version of the DB
+--function GetVersion()
+--  return "1.0.0.0"
+--end
+
+-- Returns the human name for a particular robo-name (the left side)
+function GetHumanName(name, metadata)
+  if not metadata then metadata = "0" end
+  if NameDB[name..":"..metadata] then return NameDB[name..":"..metadata]
+  elseif NameDB[name] then return NameDB[name]
+  else return nil
+  end
+end
+
+
+-- Returns the machine name(s) for a given human name (one to many mapping)
+function GetMachineName(humanName)
+  --If there are several possibilities, we'll return a table####, otherwise just a string
+  possibilities = {}
+  for k,v in pairs(NameDB) do
+    if v == humanName then 
+      table.insert(possibilities, k)
+    end
+  end
+  --if table.getn(possibilities) == 1 then
+  --  return possibilities[1]
+  --end
+  return possibilities
+end
+
+-- Access the web and grab the latest version of the API
+-- ACCESSES EXTERNAL WEBSITE --
+function UpdateAPI()
+  filename = "blockDB"
+  address = "http://example.com/"..filename
+  
+  success = false
+  
+  dwn = http.get(address)
+  if dwn.getResponseCode() == 200 then
+    file = fs.open(filename, "w")
+    file.write(dwn.readAll())
+    file.close()
+    success = true
+  end
+  dwn.close()
+  if success then
+    print("blockDB updated!")
+    return true
+  else
+    print("Error while updating blockDB.")
+    return false
+  end
+end
+
+-- Updates the database to use the latest version
+-- ACCESSES EXTERNAL WEBSITE --
+function UpdateDB()
+  address = "http://example.com/blockDB.cshtml?raw=true"
+  success = false
+  
+  dwn = http.get(address)
+  if dwn.getResponseCode() == 200 then
+    NameDB = textutils.unserialize(dwn.readAll())
+    success = true
+  end
+  dwn.close()
+  if success then
+    print("Block database updated!")
+    return true
+  else
+    print("Error while updating block database.")
+    return false
+  end
+end

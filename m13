@@ -1,0 +1,196 @@
+-- This API was written by magico13 to contain functions used in his programs
+-- You are free to use this API in any of your programs
+
+--print("This API was written by magico13 to contain functions used in his programs.")
+--print("You are free to use this API in any of your programs.")
+--print("version: "..getVersion())
+
+-- Get's the API's version
+function getVersion()
+  return 0.3
+end
+
+-- Reset the screen and set the cursor to (1,1)
+function reset()
+  term.clear()
+  term.setCursorPos(1,1)
+  if term.isColor() then
+    term.setTextColor(colors.white)
+    term.setBackgroundColor(colors.black)
+  end
+  return
+end
+
+-- Change the cursor position to that of the coordinates passed
+function cPos(x, y)
+  term.setCursorPos(x, y)
+  return
+end
+
+-- Write the text starting at the specified coordinate
+function writeAt(str, x, y)
+  term.setCursorPos(x, y)
+  write(str)
+  return
+end
+
+-- Get the x coordinate needed to center the string on the console
+function xCenter(str)
+  return ((term.getSize()-string.len(str))/2)+1
+end
+
+-- Get the x coordinate needed to justify the string on the right of the console
+function xRight(str)
+  return term.getSize()-string.len(str)+1
+end
+
+-- Write the text centered at the y coordinate passed
+function printCenter(str, y)
+  cPos(xCenter(str), y)
+  term.clearLine()
+  write(str)
+  return
+end
+
+-- Makes a border with space for a title and footer
+function makeBorder()
+  x, y = term.getSize()
+  for i=1, y do
+    cPos(1, i)
+    term.write("|")
+    cPos(x, i)
+    term.write("|")
+  end
+  cPos(1, 1)
+  term.write("*")
+  for i=2, x-1 do term.write("-") end
+  term.write("*")
+  cPos(1, 3)
+  term.write("*")
+  for i=2, x-1 do term.write("-") end
+  term.write("*")
+  cPos(1, y-2)
+  term.write("*")
+  for i=2, x-1 do term.write("-") end
+  term.write("*")
+  cPos(1, y)
+  term.write("*")
+  for i=2, x-1 do term.write("-") end
+  term.write("*")
+  return
+end
+
+-- Pops up a one line message with a border
+function popup(text)
+  local length = string.len(text)
+  local horzEdge = "*"
+  local empty = "|"
+  for i=1, length+2 do
+    horzEdge = horzEdge.."-"
+    empty = empty.." "
+  end
+  content = "| "..text.." |"
+  horzEdge = horzEdge.."*"
+  empty = empty.."|"
+  
+  _n, startY = term.getSize()
+  startY = (startY - 5)/2
+  writeAt(horzEdge, xCenter(horzEdge), startY)
+  writeAt(empty, xCenter(empty), startY+1)
+  writeAt(content, xCenter(content),  startY+2)
+  writeAt(empty, xCenter(empty), startY+3)
+  writeAt(horzEdge, xCenter(horzEdge), startY+4)
+  return
+end
+
+-- Button API Components -- 
+-- The table that holds the button data.
+local buttons = {}
+
+-- Erases the buttons data so that a new page can have buttons without accidentally calling other functions from other pages. This means the buttons must be created every time the screen appears.
+function newButtons()
+  buttons = {}
+end
+
+-- Adds the button data to the table, then calls the function that actually places the button on the screen.
+function addButton(name, text, func, x, y, textColor, backColor, width, height, minimal)
+  if not width then width=string.len(text)+2 end
+  if not height then height = 1 end
+  if not textColor then textColor = colors.black end
+  if not backColor then backColor = colors.white end
+  if x<1 then x = ((term.getSize()-width)/2)+1 end
+  if minimal then width = string.len(text) end
+
+  buttons[name] = {}
+  buttons[name]["text"]=text
+  buttons[name]["func"]=func
+  buttons[name]["x"]=x
+  buttons[name]["y"]=y
+  buttons[name]["width"]=width-1
+  buttons[name]["height"]=height-1
+  buttons[name]["textColor"]=textColor
+  buttons[name]["backColor"]=backColor
+  placeButton(buttons, name)
+end
+
+-- Places the visual button on the screen at the coordinates stored in the button data.
+function placeButton(buttonsTable, name)
+  button=buttonsTable[name]
+  local prevTxtColor = term.getTextColor()
+  local prevBackColor = term.getBackgroundColor()
+  
+  term.setTextColor(button.textColor)
+  term.setBackgroundColor(button.backColor)
+  local yspot = math.floor(button.y + (button.height/2))
+  local xspot = math.ceil(button.x + (button.width-string.len(button.text))/2)
+  for y=button.y, button.y+button.height do
+    for x=button.x, button.x+button.width do
+      writeAt(" ", x, y)
+    end
+  end
+  writeAt(button.text, xspot, yspot)
+  term.setTextColor(prevTxtColor)
+  term.setBackgroundColor(prevBackColor)
+end
+
+-- Checks if the passed coordinates correspond to a button stored in the buttons table. Returns the name of the button associated with that location.
+function buttonClicked(x,y)
+  for name, data in pairs(buttons) do
+    if y>=data["y"] and y<=(data["y"]+data["height"]) then
+      if x>=data["x"] and x<=(data["x"]+data["width"]) then
+        return name
+      end
+    end
+  end
+  return nil
+end
+
+-- Returns the "function" associated with the button name passed.
+function getFunc(name)
+  if not name then return nil end
+  return buttons[name]["func"]
+end
+
+-- Random other functions --
+
+function max(numbers)
+  local maxcount = numbers[1]
+  local maxindex = 1
+  for index, value in pairs(numbers) do
+    if value > maxcount then
+      maxcount = value
+      maxindex = index
+    end
+  end
+  return maxcount, maxindex
+end
+
+-- sets the text and background colors, returning the previous values
+function setColors(text, back)
+  local prevTxtColor = term.getTextColor()
+  local prevBackColor = term.getBackgroundColor()
+  
+  term.setTextColor(text)
+  term.setBackgroundColor(back)
+  return prevTxtColor, prevBackColor
+end

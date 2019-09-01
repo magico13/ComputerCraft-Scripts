@@ -1,0 +1,552 @@
+-- lps stands for "local positioning system"
+-- it is an API for an offline turtle position tracking system
+-- it keeps track of all movements the turtle makes (and facing changes) and logs it in a file
+-- it needs to be reset whenever the turtle is broken and replaced
+-- ideally it will work in conjunction with gps, using gps to get the initial position and periodic updates
+
+local data = {
+  position = vector.new(0, -1, 0),
+  facing = -1
+}
+
+local posFile = "lps_data.txt"
+local initialized = false
+
+local SendRedMsg = false
+local RedMsgID = 0
+
+-- south is facing 0 and z+
+-- west is facing 1 and x-
+-- north is facing 2 and z-
+-- east is facing 3 and x+
+
+
+--write the position file
+function updateFile()
+  f = fs.open(posFile, "w")
+  f.write(textutils.serialize(data))
+  f.close()
+  SendRedMsgUpdate()
+end
+
+--reads from the file
+function getFromFile()
+  if fs.exists(posFile) then
+    f = fs.open(posFile, "r")
+    data = textutils.unserialize(f.readAll())
+    f.close()
+    return true
+  end
+  return false
+end
+
+-- Gets whether the API is initialized
+function IsInitialized()
+  return initialized
+end
+
+-- Initializes with the given coordinates
+function Initialize(x, y, z, facing)
+  if not x or not y or not z or not facing then
+    print("Error! Missing position info!")
+    return false
+  end
+  data.position = vector.new(x, y, z)
+  data.facing = facing
+  updateFile()
+  initialized = true
+  return true
+end
+
+-- tries to get position from gps API
+function gpsInitialize(facing, timeout, deb) --facing can be figured out by the change in position if we allow that
+  if not facing then
+    print("Requires facing data!")
+    print("Pass \"file\" to use cached facing")
+    return false
+  end
+  if facing == "file" then
+    if not getFromFile() then return false end
+    facing = data.facing
+  end
+  pos = vector.new(gps.locate(timeout, deb))
+  if not pos then return false end
+  data.position = pos
+  data.facing = facing
+  updateFile()
+  initialized = true
+  return true
+end
+
+-- initializes based on the file
+function fileInitialize()
+  print("Warning! Using cached position data. May not be accurate!")
+  initialized = getFromFile()
+  return initialized
+end
+
+-- Sets up redmsg messaging
+function SetupRedMsg(tgtID)
+  if not redmsg then
+    print("redmsg API not loaded")
+    return false
+  end
+  SendRedMsg = true
+  RedMsgID = tgtID
+  return true
+end
+
+function SendRedMsgUpdate()
+  if SendRedMsg and RedMsgID >= 0 then
+    local redData = {}
+    redData.fuel = turtle.getFuelLevel()
+    redData.position = locateVec()
+    message = redmsg.CreateMessage(RedMsgID, "LPSUpdate", textutils.serialize(redData), { "NOSAVE", "NOCONFIRM" })
+    redmsg.SendNoWait(message)
+    --doesn't wait for, or expect a response, and the mail server won't save the message
+  end
+end
+
+-- moves the turtle forward, returns success
+function forward()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if (turtle.forward()) then
+    if data.facing == 0 then
+      data.position.z = data.position.z + 1
+    elseif data.facing == 1 then 
+      data.position.x = data.position.x - 1
+    elseif data.facing == 2 then
+      data.position.z = data.position.z - 1
+    elseif data.facing == 3 then
+      data.position.x = data.position.x + 1
+    else --shouldn't be possible 
+      return false
+    end
+    updateFile()
+    return true
+  end
+  return false
+end
+
+-- turns the turtle to the right *times* times
+-- can't fail, so let us turn multiple times
+-- returns final facing
+function turnRight(times)
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if not times then times = 1 end
+  for t=1,times do
+    turtle.turnRight()
+    data.facing = (data.facing + 1) % 4
+  end
+  return facing
+end
+
+-- turns the turtle to the left *times* times
+-- can't fail, so let us turn multiple times
+-- returns final facing
+function turnLeft(times)
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if not times then times = 1 end
+  for t=1,times do
+    turtle.turnLeft()
+    data.facing = (data.facing - 1) % 4
+  end
+  updateFile()
+  return facing
+end
+
+-- moves the turtle backwards
+-- returns success
+function back()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if (turtle.back()) then
+    if data.facing == 0 then
+      data.position.z = data.position.z - 1
+    elseif data.facing == 1 then 
+      data.position.x = data.position.x + 1
+    elseif data.facing == 2 then
+      data.position.z = data.position.z + 1
+    elseif data.facing == 3 then
+      data.position.x = data.position.x - 1
+    else --shouldn't be possible 
+      return false
+    end
+    updateFile()
+    return true
+  end
+  return false
+end
+
+-- moves the turtle up
+-- returns success
+function up()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if turtle.up() then
+    data.position.y = data.position.y + 1
+    updateFile()
+    return true
+  end
+  return false
+end
+
+-- moves the turtle down
+-- returns success
+function down()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if turtle.down() then
+    data.position.y = data.position.y - 1
+    updateFile()
+    return true
+  end
+  return false
+end
+
+-- move in the specified direction
+-- 4 is up, 5 is down
+function moveInDir(dir)
+  if dir < 4 then
+    face(dir)
+    return forward()
+  elseif dir == 4 then
+    return up()
+  elseif dir == 5 then
+    return down()
+  end
+end
+
+-- turns the turtle so if faces the given direction
+function face(dir)
+  dir = dir % 4
+  cF = data.facing
+  nF = dir + 4
+  
+  rights = (nF - cF) % 4
+  if rights > 2 then --turn left instead
+    while data.facing ~= dir do
+      turnLeft()
+    end
+  else --turn right
+    while data.facing ~= dir do
+      turnRight()
+    end
+  end
+  return true
+end
+
+-- gets the current position
+function locate()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  return data.position.x, data.position.y, data.position.z
+end
+
+-- gets the current position as a vector
+function locateVec()
+  return vector.new(locate())
+end
+
+-- returns the current facing
+function facing()
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  return data.facing
+end
+
+-- attempts to path to the provided location
+-- returns if it was able to path there
+-- makes an attempt at pathfinding around obstacles
+function go(x, y, z)
+  return goVec(vector.new(x, y, z))
+end
+
+-- Goes to the provided location
+-- this one includes a modified A* pathfinding algorithm
+ function goVec(tgt, pathFindTimes)
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  
+  tgt = vector.new(tgt.x, tgt.y, tgt.z)
+  
+  local timesIdeal = 0 --a counter for how many times we've moved ideally when pathfinding
+  idealThreshold = 7 --if we're ideal this many times, then mark us as unobstructed
+  alpha = 1 -- a weighting factor. Lower means that we focus on nearby blocks first
+  
+  local openSet = {  }
+  local closedSet = {  }
+  
+  local stuckTimes = 0
+  if not pathFindTimes then pathFindTimes = 200 end
+  
+  local going = true
+  local obstructed = false
+  while going do
+    if not obstructed then --move ideally, no real pathfinding (techincally it's an optimal A*)
+      disp = tgt - data.position
+      --z is biggest
+      if disp.z ~= 0 and math.abs(disp.z) >= math.abs(disp.y) and math.abs(disp.z) >= math.abs(disp.x) then
+        if tgt.z > data.position.z then --target is south
+          -- turn south, 0
+          if not moveInDir(0) then obstructed=true end
+        elseif tgt.z < data.position.z then --target is north
+          -- turn north, 2
+          if not moveInDir(2) then obstructed=true end
+        end
+      -- x is biggest
+      elseif disp.x ~= 0 and math.abs(disp.x) >= math.abs(disp.y) and math.abs(disp.x) >= math.abs(disp.z) then
+        if tgt.x > data.position.x then --target is east
+          -- turn east, 3
+          if not moveInDir(3) then obstructed=true end
+        elseif tgt.x < data.position.x then --target is west
+          -- turn west, 1
+          if not moveInDir(1) then obstructed=true end
+        end
+      -- y is biggest
+      elseif disp.y ~= 0 and math.abs(disp.y) >= math.abs(disp.x) and math.abs(disp.y) >= math.abs(disp.z) then
+        if disp.y > 0 then -- go up
+          if not up() then obstructed=true end
+        elseif disp.y < 0 then
+          if not down() then obstructed=true end
+        end
+      end
+      if obstructed then --we moved without issue
+        --table.insert(closedSet, locateVec())
+--        openSet = {} -- clear the open set
+      --else
+        table.insert(closedSet, locateVec())
+        timesIdeal = 0
+        openSet = {}
+        print("We got stuck.")
+      end
+    end
+    
+    --we hit something so we need to pathfind
+    --based on A*
+    if obstructed then --pathfind
+      if pathFindTimes > 0 then
+        stuckTimes = stuckTimes  + 1
+        if stuckTimes == pathFindTimes then 
+          print("Stuck for too long.")
+          return false 
+        end --adds an upper limit to how long we can be stuck for
+      end
+     -- check our surroundings to see where we can go
+      surroundings = checkSurroundings()
+      for k,v in pairs(surroundings) do
+        pos = positionForFace((k+3)%6)
+        if not v then -- not obstructed
+          if not VectorInSet(pos, closedSet) and not VectorInSet(pos, openSet) then          
+            table.insert(openSet, pos)
+          --  print((k+3)%6, ":", v)
+          --else
+          --  print((k+3)%6,": already tested")
+          end
+        elseif VectorsEqual(pos, tgt) then --the target is obstructed
+          return false
+        end
+      end
+      
+      -- analyze the open set for the best solutions
+      local minPreMove = minDist(data.position, tgt)
+      local bestSolution = data.position
+      local bestF = 100*minPreMove
+      local bestIndex = 0
+      for index, vec in pairs(openSet) do
+        local h = minDist(tgt, vec) -- get the minimum distance
+        -- get the distance from where we are now (ideally we implement A* and use the closed set as the universe)
+        local g = minDist(vec, data.position) -- not optimal, but ok
+     --   print(vec:tostring(), ": h=",  h, " g=", g)
+
+        local f = g + alpha*h
+        if f < bestF then
+          bestSolution = vec
+          bestF = f
+          bestIndex = index
+        end
+      end
+
+      
+      --navigate to the bestSolution
+      if goWaypointsClosest(bestSolution, closedSet) then --use the closed set as a list of waypoints to use (so we follow them)
+        --print("Made it to solution")
+        table.insert(closedSet, locateVec()) -- add it to the closed set
+       -- for k,v in pairs(closedSet) do
+       --   print(v.x, ", ", v.y, ", ", v.z)
+       -- end
+       -- print(VectorsEqual( table.remove(openSet, bestIndex), data.position)) -- remove it from the open set
+        table.remove(openSet, bestIndex)
+      else
+        return false --that method can't (really) return false unless we do in this one
+      end
+      
+      -- we're moving along the optimal route
+      if (minPreMove == 1+minDist(data.position, tgt)) then --we moved precisely one closer
+        timesIdeal = timesIdeal + 1
+      else
+        timesIdeal = 0
+      end
+      
+      if timesIdeal >= idealThreshold then -- we've probably broken free
+        obstructed = false
+        openSet = {}
+        print("We broke free!")
+        timesIdeal = 0
+        stuckTimes = 0
+      end
+    end
+    going = not (minDist(tgt) == 0)
+  end
+  --print("this done")
+  return true
+end
+ 
+-- checks if the vector is in the set of vectors
+function VectorInSet(vec, set)
+  for k, v in pairs(set) do
+    if VectorsEqual(vec, v) then return true end
+  end
+  return false
+end
+ 
+function VectorsEqual(v1, v2)
+  return v1.x == v2.x and v1.y == v2.y and v1.z == v2.z
+end
+ 
+function minDist(endVec, startVec)
+  if not startVec then startVec = locateVec() end
+  delta = endVec - startVec
+  return math.abs(delta.x)+math.abs(delta.y)+math.abs(delta.z)
+end
+ 
+-- attempts to path to the provided location, travelling through the designated waypoints in order
+-- returns if it was able to path there
+-- makes an attempt at pathfinding around obstacles
+-- waypoints is a list of waypoints that can be used to fine tune the path that is taken
+  -- for instance, to avoid an obstacle, or to use specific tunnels
+  -- it goes to each waypoint in order. It doesn't know to skip unnecessary waypoints
+function goWaypoints(tgt, waypoints)
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  if waypoints then
+    for k,v in pairs(waypoints) do
+      if not goVec(v) then return false end
+    end
+  end
+  return goVec(tgt)
+end
+
+-- an expansion of goWaypoints that goes in order of which waypoint is closest to the current location
+-- will skip unnecessary waypoints
+-- can be used to create general paths that the turtle will try to follow (ie, follow tunnels but don't go down all of them)
+function goWaypointsClosest(tgt, waypoints)
+  --print(textutils.serialize(waypoints))
+  if not tgt then return false end
+  if not IsInitialized() then 
+    if not fileInitialize() then return false end
+  end
+  going = true
+  while going do
+    closest = tgt
+    closestDist = minDist(tgt)
+    if waypoints then
+      for k,v in pairs(waypoints) do
+        --if not goVec(v) then return false
+        dist = minDist(v)
+        if dist < closestDist then --don't choose the one we're at
+          vD = minDist(v, tgt)
+          wD = minDist(tgt)
+          if vD < wD then -- the waypoint is closer to the target than we are right now
+            closest = v
+            closestDist = dist
+          end
+        end
+      end
+    end
+    if not goVec(vector.new(closest.x, closest.y, closest.z)) then return false end
+    _v = (data.position - tgt)
+    going = (_v:length() ~= 0)
+  end
+  return true
+end
+
+-- Checks the surroundings for obstacles
+function checkSurroundings()
+  --print("Evaluating surroundings")
+  --evaluate our surroundings
+  surroundings = {}
+  --up
+  surroundings[1] = turtle.detectUp()
+  surroundings[2] = turtle.detectDown()
+  
+ -- if minimal then
+  --  if not turtle.detect() then --if we don't detect anything then we can stop looking
+  --    return surroundings, false --surroundings table and whether we did a full sweep (false) (or not detect forward)
+   -- end
+ -- end
+  
+  for i=3,6 do
+    surroundings[data.facing+3] = turtle.detect()
+    turnLeft()
+  end
+  return surroundings--, true --surroundings table and whether we did a full sweep (true)
+end
+
+
+function positionForFace(face)
+  if face == 0 then
+    return vector.new(data.position.x, data.position.y, data.position.z+1)
+  elseif face == 1 then
+    return vector.new(data.position.x-1, data.position.y, data.position.z)
+  elseif face == 2 then
+    return vector.new(data.position.x, data.position.y, data.position.z-1)
+  elseif face == 3 then
+    return vector.new(data.position.x+1, data.position.y, data.position.z)
+  elseif face == 4 then --up
+    return vector.new(data.position.x, data.position.y+1, data.position.z)
+  elseif face == 5 then --down
+    return vector.new(data.position.x, data.position.y-1, data.position.z)
+  end
+  return vector.new(0, -1, 0)
+end
+
+function directionNameToFacing(name)
+  if name == "south" then return 0 end
+  if name == "west" then return 1 end
+  if name == "north" then return 2 end
+  if name == "east" then return 3 end
+  return name
+end
+
+function facingToDirectionName(face)
+  if face%4 == 0 then return "south" end
+  if face%4 == 1 then return "west" end
+  if face%4 == 2 then return "north" end
+  if face%4 == 3 then return "east" end
+  return face
+end
+
+-- if run directly --
+args = {...}
+if args[1] == "locate" then print(locateVec():tostring()..","..facingToDirectionName(facing()).."("..facing()..")") end
+if args[1] == "set" then
+  face = directionNameToFacing(args[5])
+  Initialize(tonumber(args[2]), tonumber(args[3]), tonumber(args[4]), face)
+end
+if args[1] == "go" then
+  go(tonumber(args[2]), tonumber(args[3]), tonumber(args[4]))
+end

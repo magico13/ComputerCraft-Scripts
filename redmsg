@@ -1,0 +1,368 @@
+--[[
+This is an API with the purpose of message passing between computercraft computers facilitated by long range wireless routers.
+These routers have the additional job of storing messages intended for targets that are "registered" with them and delivering
+the messages at a future point (email).
+This is a successor to an older system that ran on ComputerCraft 1.4 or 1.5, from circa 2013.
+]]--
+
+MessageFile = nil
+local dupeProtection = false
+local lastMID = {}
+local sendTimer = 1 --in ticks
+local lastSend = os.clock()
+
+local Debug = false
+
+-- Returns the version number
+function GetVersion()
+  return "1.2.1.0"
+end
+
+-- Initializes the system for communication by finding and then opening a (preferably wireless) modem for communication
+-- Returns the side the modem is on, or nil if no modems were found
+function Initialize(file, protect)
+  math.randomseed(os.clock())
+  if file then redmsg.MessageFile = file end
+  dupeProtection = protect
+  local sides={"top", "left", "right", "back", "front", "bottom"}
+  local mSide=nil
+  for i=1, 6 do
+    if peripheral.getType( sides[i] ) == "modem" then 
+      mSide = sides[i]
+      break
+    end
+  end
+  if mSide then
+    rednet.open(mSide)
+    return mSide
+  end
+  return nil
+end
+
+-- Finalizes the system and closes the modem on the provided side
+function Finalize(side)
+  rednet.close(side)
+end
+
+
+
+-- Message Creation/Parsing --
+
+-- Creates a message to the specified ID
+-- Returns the message (a table)
+function CreateMessage(toID, subj, text, attrs)
+  ourID = os.getComputerID()
+  if not attrs then attrs = {} end
+  message = {
+    targetID=toID,
+    subject=subj,
+    body=text,
+    sourceID=ourID,
+    mID=GenerateID(ourID, toID),
+    routePath={ ourID },
+    attributes=attrs,
+  }
+  
+  return message
+end
+
+-- Generates an ID for the message
+function GenerateID(ourID, tgtID)
+  --math.randomseed(os.time())
+  id =  ourID..":"..tgtID..":"..os.day()..":"..os.time()
+  id = id .. ":" .. math.random(0, 9) .. math.random(0, 9) .. math.random(0, 9) .. math.random(0, 9)
+  return id
+end
+
+-- Serializes the message into a string to get sent
+-- Returns the message as a string
+function SerializeMessage(message)
+  return textutils.serialize(message)
+end
+
+-- Deserializes a string into the message table
+-- Returns the table form of the message
+function UnserializeMessage(msgSrl)
+  return textutils.unserialize(msgSrl)
+end
+
+-- Deserializes a string into the to, from, subject, and body items
+-- Returns all four items
+-- Probably more immediately useful than getting the table form
+function UnserializeMessageFull(msgSrl)
+  message = textutils.unserialize(msgSrl)
+  return message.targetID, message.sourceID, message.subject, message.body
+end
+
+-- Breaks the message table into just the four main pieces
+function GetComponents(message)
+  if message then
+    return message.targetID, message.sourceID, message.subject, message.body
+  else
+    return nil
+  end
+end
+
+
+
+-- Message Sending and Receiving --
+
+-- Creates a new message and sends it
+-- Assumes it's been initialized. Waits for a response
+function CreateAndSend(toID, subj,  text, attrs)
+  message = CreateMessage(toID, subj, text, attrs)
+  return SendMessage(message, router)
+end
+
+-- Broadcast a message
+-- Returns whether the message has been received
+function SendMessage(message)
+  SendNoWait(message)
+  --Wait for a response, try for 0.2 second (four ticks)
+  if not ElementInTable(message.attributes, "NOCONFIRM") then
+    printDebug("awaiting response")
+    received = ReceiveMessage(0.2, nil, message)
+    if received then printDebug("Got expected response") return true end
+    -- no response, assume failure
+    printDebug("No response")
+    return false
+  else
+    return true
+  end
+end
+
+-- Sends a message and doesn't wait for a success response
+function SendNoWait(message)
+  while (os.clock() - lastSend) < (sendTimer * 0.05) do
+    printDebug("Waiting to send... "..(os.clock() - lastSend))
+    sleep(0.05)
+  end
+  printDebug("Sending message "..message.mID)
+  serialized = SerializeMessage(message)
+  printDebug("Serialized: ".. serialized)
+  rednet.broadcast(serialized, "redmsg")
+  printDebug("broadcast")
+  lastSend = os.clock()
+end
+
+-- Waits timeout seconds to receive a message. Returns a success message. Pass 0 to wait forever
+-- Will route any messages it receives
+-- Saves received messages to a file
+function ReceiveMessage(timeout, fileToSave, original) --original is if we're waiting for a response
+  startTime = os.clock()
+  if not fileToSave then fileToSave = redmsg.MessageFile end
+  if not timeout then timeout = 0 end
+  printDebug("Receiving for "..timeout.." seconds")
+  while true do
+    if timeout <= 0 then
+      sender, msgSrl, protocol = rednet.receive("redmsg")
+    else
+      sender, msgSrl, protocol = rednet.receive("redmsg", math.max(timeout-(os.clock()-startTime), 0.1))
+    end
+    
+    if msgSrl then
+      printDebug("Got something from "..sender)
+      processed = ProcessReceived(sender, msgSrl, fileToSave, original)
+      if processed then printDebug("Got mID "..processed.mID) return processed end
+    else
+      if timeout > 0 and (os.clock() - startTime) >= timeout then
+        return nil --we received nothing for us in the given amount of time
+      end
+    end
+  end 
+end
+
+-- Routes the provided message
+function Route(message)
+  if IsDuplicate(message.mID) then return false end
+  if (ElementInTable(message.attributes, "NOROUTE")) then return false end
+  ourID = os.getComputerID()
+  if not ElementInTable(message.routePath, ourID) then --we haven't routed this
+    table.insert(message.routePath, ourID)
+    --reserialize
+    printDebug("Routing "..message.mID)
+    SendNoWait(message)
+    AddToLastMID(message.mID)
+    return true
+  end
+  return false
+end
+
+
+-- Processing and Handling Messages --
+
+-- Processes a received message.
+-- Returns either the message or nil if we route it
+function ProcessReceived(sender, msgSrl, fileToSave, original)
+  received = UnserializeMessage(msgSrl)
+  if IsDuplicate(received.mID) then 
+    printDebug("Duplicate Received")
+    return nil 
+  end
+  
+  --compatibility
+  if not received.attributes then received.attributes = {} end
+  
+  if received.targetID == os.getComputerID() or received.targetID < 0 then --it's for us or a broadcast
+    if not original or not IsResponse(original, received) then -- we don't expect a response or it's not a response message
+      if received.targetID >= 0 then --if it isn't a general broadcast, then respond
+        if not IsAnyResponse(received) then
+          AddToLastMID(received.mID)
+          if not ElementInTable(received.attributes, "NOCONFIRM") then
+            printDebug("about to reply")
+            response = GenerateSuccessResponse(received) 
+            SendNoWait(response) --send a response to acknowledge receipt
+          end
+        end
+      else --It's a general broadcast, we save it and route it
+        Route(received)
+      end
+      
+      if fileToSave then --save it to the file
+        file = fs.open(fileToSave, "a")
+        file.writeLine(received)
+        file.close()
+      end
+      if not original then --we weren't waiting for a response, just a message, so we can return the message
+        return received
+      end --otherwise we keep waiting for our response
+    else --we're looking for a specific response
+      if IsAnyResponse(received) then printDebug("Is a response") end
+      if IsResponse(original, received) then --got our response
+        return received --return the response message
+      end
+    end
+  else -- not for us, route it
+    Route(received)
+    return nil
+  end
+end
+
+-- Returns true if the message is a response to the orginal
+function IsResponse(original, received)
+  if received.targetID == os.getComputerID() 
+  and received.sourceID == original.targetID
+  and received.body == original.mID then
+    -- received positive response, return true
+    printDebug("Got response")
+    return true
+  else
+    return false
+  end
+end
+
+-- Checks if the message is (probably) a response message for *someone*
+-- Trivial to fake
+function IsAnyResponse(message)
+  if message.subject == "RedMsgResponse" then
+    return true
+  else
+    return false
+  end
+end
+
+-- Checks to see if it is a duplicate
+function IsDuplicate(msgID)
+  if lastMID then
+    return ElementInTable(lastMID, msgID)
+  end
+end
+
+-- Generates a success response message
+function GenerateSuccessResponse(message)
+  sleep(0.05)
+  printDebug("Generating response")
+  ourID = message.targetID
+  text = message.mID
+  theirID = message.sourceID
+  
+  response = CreateMessage(theirID, "RedMsgResponse", text)
+  response.sourceID = ourID --in case the router is sending the response, we spoof the original
+  return response
+end
+
+
+
+-- Helper functions --
+
+-- Returns whether the provided element is located in the table
+function ElementInTable(tab, element)
+  if not tab then return nil end
+  for index, value in pairs(tab) do
+    if value == element then
+      return index
+    end
+  end
+  return nil
+end
+
+-- Checks if the vector is in the table
+function VectorInTable(tab, vec)
+  for index, value in pairs(tab) do
+    if value.x == vec.x and value.y == vec.y and value.z == vec.z then
+      return index
+    end
+  end
+  return nil
+end
+
+function AddToLastMID(mID)
+  table.insert(lastMID, mID)
+  --Only store 10 values
+  tsize=table.getn(lastMID)
+  if tsize > 10 then
+    for i=0,(tsize-10) do
+      table.remove(lastMID, 1)
+    end
+  end
+end
+
+-- Prints out a message and all its fields
+function Print(message)
+  if not message then return end
+  for key,value in pairs(message) do
+    if type(value) == "table" then
+      for k2, v2 in pairs(value) do
+        print (k2, " -- ", v2)
+      end
+    else
+      print(key, " - ", value)
+    end
+  end
+end
+
+-- Prints a debug message
+function printDebug(msg)
+  if (Debug) then print("DB: "..msg) end
+end
+
+-- Pulls the latest version of the API from the web
+-- ACCESSES EXTERNAL WEBSITE --
+function UpdateAPI()
+  filename = "redmsg"
+  address = "http://example.com/"..filename
+  
+  success = false
+  
+  dwn = http.get(address)
+  if dwn and dwn.getResponseCode() == 200 then
+    file = fs.open(filename, "w")
+    file.write(dwn.readAll())
+    file.close()
+    success = true
+  end
+  if dwn then dwn.close() end
+  if success then
+    print("redmsg updated!")
+    return true
+  else
+    print("Error while updating redmsg.")
+    return false
+  end
+end
+
+-- If called directly, print the version and then update
+print("Redmsg version "..GetVersion())
+args = {...}
+if args[1] == "update" then UpdateAPI() end
+--UpdateAPI()
