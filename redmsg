@@ -15,7 +15,7 @@ local Debug = false
 
 -- Returns the version number
 function GetVersion()
-  return "1.2.1.0"
+  return "1.2.2.0"
 end
 
 -- Initializes the system for communication by finding and then opening a (preferably wireless) modem for communication
@@ -140,7 +140,7 @@ function SendNoWait(message)
   printDebug("Sending message "..message.mID)
   serialized = SerializeMessage(message)
   printDebug("Serialized: ".. serialized)
-  rednet.broadcast(serialized, "redmsg")
+  rednet.broadcast(serialized)
   printDebug("broadcast")
   lastSend = os.clock()
 end
@@ -155,9 +155,9 @@ function ReceiveMessage(timeout, fileToSave, original) --original is if we're wa
   printDebug("Receiving for "..timeout.." seconds")
   while true do
     if timeout <= 0 then
-      sender, msgSrl, protocol = rednet.receive("redmsg")
+      sender, msgSrl, protocol = rednet.receive()
     else
-      sender, msgSrl, protocol = rednet.receive("redmsg", math.max(timeout-(os.clock()-startTime), 0.1))
+      sender, msgSrl, protocol = rednet.receive(math.max(timeout-(os.clock()-startTime), 0.1))
     end
     
     if msgSrl then
@@ -340,7 +340,7 @@ end
 -- ACCESSES EXTERNAL WEBSITE --
 function UpdateAPI()
   filename = "redmsg"
-  address = "http://example.com/"..filename
+  address = "https://raw.githubusercontent.com/magico13/ComputerCraft-Scripts/master/"..filename
   
   success = false
   

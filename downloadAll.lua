@@ -48,7 +48,7 @@ function DownloadList(list)
 end
 
 function DownloadFile(filename)
-  address = "http://example.com/"..filename
+  address = "https://raw.githubusercontent.com/magico13/ComputerCraft-Scripts/master/"..filename
   success = false
   
   dwn = http.get(address)
