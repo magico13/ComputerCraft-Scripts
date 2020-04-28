@@ -37,7 +37,7 @@ end
 -- listens for incoming messages (to store, or for registration/deregistration)
 function ReceiveLoop()
   while true do
-    sender, msgSrl, protocol = rednet.receive("redmsg") --listen for messages
+    sender, msgSrl, protocol = rednet.receive() --listen for messages
     message = redmsg.UnserializeMessage(msgSrl)
     if not redmsg.IsDuplicate(message.mID) then
       resp = redmsg.ProcessReceived(send, msgSrl, nil, nil)

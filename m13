@@ -136,8 +136,8 @@ end
 -- Places the visual button on the screen at the coordinates stored in the button data.
 function placeButton(buttonsTable, name)
   button=buttonsTable[name]
-  local prevTxtColor = term.getTextColor()
-  local prevBackColor = term.getBackgroundColor()
+  local prevTxtColor = colors.white --term.getTextColor()
+  local prevBackColor = colors.black --term.getBackgroundColor()
   
   term.setTextColor(button.textColor)
   term.setBackgroundColor(button.backColor)
@@ -187,10 +187,10 @@ end
 
 -- sets the text and background colors, returning the previous values
 function setColors(text, back)
-  local prevTxtColor = term.getTextColor()
-  local prevBackColor = term.getBackgroundColor()
+  --local prevTxtColor = term.getTextColor() -- v1.74 or later
+  --local prevBackColor = term.getBackgroundColor()
   
   term.setTextColor(text)
   term.setBackgroundColor(back)
-  return prevTxtColor, prevBackColor
+  --return prevTxtColor, prevBackColor
 end

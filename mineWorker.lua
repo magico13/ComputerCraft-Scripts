@@ -117,9 +117,9 @@ function CompileData()
   redData.busy = isBusy
   redData.inventory = {}
   
-  for slot=1,16 do
-    table.insert(redData.inventory, turtle.getItemDetail(slot))
-  end
+  -- for slot=1,16 do
+  --   table.insert(redData.inventory, turtle.getItemDetail(slot))
+  -- end
   
   return redData
 end

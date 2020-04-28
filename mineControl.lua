@@ -292,7 +292,7 @@ function selectTurtle(name)
   local id = string.sub(name, string.find(name, ":")+1)
   id = tonumber(id)
   --center the screen on the turtle
-  topLeft = vector.new(turtleStats[id].position.x - (tx-2)/2, turtleStats[id].position.y, turtleStats[id].position.z - (ty-2)/2)
+  topLeft = vector.new(math.floor(turtleStats[id].position.x - (tx-2)/2), turtleStats[id].position.y, math.floor(turtleStats[id].position.z - (ty-2)/2))
   curY = topLeft.y
   resetScreen()
 end
