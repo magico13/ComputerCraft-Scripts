@@ -1,14 +1,16 @@
 
-local isBusy = "no"
-
+local isBusy = 0
+local waypoints_c = {}
+local caches_c = {}
 
 function SendBlockMined(tgt, block)
-  redmsg.CreateAndSend(tgt, "BlockMined", textutils.serialize(block), { "NOSAVE" })
+  redmsg.CreateAndSend(tgt, "MINE:MINED", textutils.serialize(block), { "NOSAVE" })
 end
 
 
 function MineBlocks(blocks)
   local lastAttempts = {}
+  local mineDelay = 0.5
   while table.getn(blocks) > 0 do
     toRemove = 0
     nextToABlock = false
@@ -18,6 +20,7 @@ function MineBlocks(blocks)
         if block.y > pos.y then --it's up
           while turtle.detectUp() do --handle gravel
             turtle.digUp()
+            os.sleep(mineDelay)
           end
         elseif block.y < pos.y then --it's down
           while turtle.detectDown() do
@@ -27,21 +30,25 @@ function MineBlocks(blocks)
           lps.face(3)
           while turtle.detect() do
             turtle.dig()
+            os.sleep(mineDelay)
           end
         elseif block.x < pos.x then --it's west
           lps.face(1)
           while turtle.detect() do
             turtle.dig()
+            os.sleep(mineDelay)
           end
         elseif block.z > pos.z then --it's south
           lps.face(0)
           while turtle.detect() do
             turtle.dig()
+            os.sleep(mineDelay)
           end
         elseif block.z < pos.z then --it's north
           lps.face(2)
           while turtle.detect() do
             turtle.dig()
+            os.sleep(mineDelay)
           end
         end
         nextToABlock = true
@@ -54,7 +61,9 @@ function MineBlocks(blocks)
     if nextToABlock and toRemove > 0 then
       table.remove(blocks, toRemove)
     end
-    if not nextToABlock then
+    if InventorySlotsUsed() == 16 then
+      DropOffAtCache()
+    elseif not nextToABlock then
       --we need to move
       --find the closest block
       local closest = blocks[1]
@@ -92,10 +101,50 @@ function MineBlocks(blocks)
       if not newClosest then return false end
       
       table.insert(lastAttempts, newClosest)
-      lps.goVec(newClosest, 10) -- go to the closest block
+      lps.goWaypointsClosest(newClosest, waypoints_c, 10)
+      --lps.goVec(newClosest, 10) -- go to the closest block
     end --if not nextToABlock
   end
   return true
+end
+
+function DropOffAtCache()
+  -- When the inventory is too full, we have to drop stuff off at the closest cache
+  local pos = lps.locateVec()
+  if not caches_c then return end
+  local closest = caches_c[1]
+  local closeDist = lps.minDist(caches_c[1], pos)
+  for _i, block in pairs(caches_c) do
+    local d = lps.minDist(block, pos)
+    if d < closeDist then
+      closest = block
+      closeDist = d
+    end
+  end
+  tgt = closest + vector.new(0, 1, 0)
+  -- have closest cache, now travel to the space right above it
+  if lps.goWaypointsClosest(tgt, waypoinst_c) then
+    DumpInventoryBelow()
+  end
+  randVec = vector.new(math.random(6)-3, math.random(3), math.random(6)-3)
+  -- move somewhere else
+  lps.goVec(tgt + randVec)
+end
+
+function DumpInventoryBelow()
+  for slot=1,16 do
+    turtle.select(slot)
+    turtle.dropDown()
+  end
+  turtle.select(1)
+end
+
+function InventorySlotsUsed()
+  local used = 0
+  for slot=1,16 do
+    if turtle.getItemCount(slot) > 0 then used = used + 1 end
+ end
+ return used
 end
 
 function SendRegister(tgtID)
@@ -117,9 +166,9 @@ function CompileData()
   redData.busy = isBusy
   redData.inventory = {}
   
-  -- for slot=1,16 do
-  --   table.insert(redData.inventory, turtle.getItemDetail(slot))
-  -- end
+  for slot=1,16 do
+     table.insert(redData.inventory, turtle.getItemCount(slot))
+  end
   
   return redData
 end
@@ -193,19 +242,23 @@ end
 
 --lps.SetupRedMsg(redmsgID)
 --lps.SendRedMsgUpdate()
+math.randomseed(os.time())
 print("Initialized")
 
 local _lastID = -1
 
 while true do
   print("Waiting for message...")
-  isBusy = "no"
+  isBusy = 0
   local message = redmsg.ReceiveMessage()
   target, sender, subject, body = redmsg.GetComponents(message)
   
   if tonumber(target) < 0 then --broadcast, might be registration
     print("Got broadcast")
     if subject == "MINE:INITIALIZE" then --is registration
+      dataTable = textutils.unserialize(body)
+      waypoints_c = dataTable.waypoints
+      caches_c = dataTable.caches
       SendRegister(sender)
     end
   end
@@ -215,29 +268,37 @@ while true do
     if subject == "MINE:GO" then
       tgtTable = textutils.unserialize(body)
       tgt = vector.new(tgtTable.tgt.x, tgtTable.tgt.y, tgtTable.tgt.z)
-      waypoints = tgtTable.waypoints
+      waypoints_c = tgtTable.waypoints
       print("Going to "..tgt:tostring())
-      isBusy = "yes"
+      isBusy = 1
       SendUpdate(sender)
-      madeIt = lps.goWaypointsClosest(tgt, waypoints)
+      madeIt = lps.goWaypointsClosest(tgt, waypoints_c)
       print("Success? ", madeIt)
-      isBusy = "no"
+      isBusy = 0
       SendUpdate(sender)
     elseif subject == "MINE:MINE" then
       print("Attempting to mine some blocks")
       local blocks = textutils.unserialize(body)
-      isBusy = "yes"
+      isBusy = 1
       SendUpdate(sender)
       MineBlocks(blocks)
-      isBusy = "no"
+      isBusy = 0
       SendUpdate(sender)
     elseif subject == "MINE:HEARTBEAT" then
       print("heartbeat")
+      dataTable = textutils.unserialize(body)
+      waypoints_c = dataTable.waypoints
+      caches_c = dataTable.caches
+      os.sleep(math.random(20)/10)
       SendUpdate(tonumber(sender))
     elseif subject == "END" then
       print("Received END message")
       break
     end
+  end
+
+  if InventorySlotsUsed() == 16 then
+    DropOffAtCache()
   end
 end
 

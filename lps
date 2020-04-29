@@ -381,7 +381,7 @@ end
 
       
       --navigate to the bestSolution
-      if goWaypointsClosest(bestSolution, closedSet) then --use the closed set as a list of waypoints to use (so we follow them)
+      if goWaypointsClosest(bestSolution, closedSet, pathFindTimes) then --use the closed set as a list of waypoints to use (so we follow them)
         --print("Made it to solution")
         table.insert(closedSet, locateVec()) -- add it to the closed set
        -- for k,v in pairs(closedSet) do
@@ -453,7 +453,7 @@ end
 -- an expansion of goWaypoints that goes in order of which waypoint is closest to the current location
 -- will skip unnecessary waypoints
 -- can be used to create general paths that the turtle will try to follow (ie, follow tunnels but don't go down all of them)
-function goWaypointsClosest(tgt, waypoints)
+function goWaypointsClosest(tgt, waypoints, pathFindTimes)
   --print(textutils.serialize(waypoints))
   if not tgt then return false end
   if not IsInitialized() then 
@@ -477,7 +477,7 @@ function goWaypointsClosest(tgt, waypoints)
         end
       end
     end
-    if not goVec(vector.new(closest.x, closest.y, closest.z)) then return false end
+    if not goVec(vector.new(closest.x, closest.y, closest.z), pathFindTimes) then return false end
     _v = (data.position - tgt)
     going = (_v:length() ~= 0)
   end

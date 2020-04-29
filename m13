@@ -187,10 +187,11 @@ end
 
 -- sets the text and background colors, returning the previous values
 function setColors(text, back)
-  --local prevTxtColor = term.getTextColor() -- v1.74 or later
-  --local prevBackColor = term.getBackgroundColor()
+--local prevTxtColor = term.getTextColor() -- v1.74 or later
+--local prevBackColor = term.getBackgroundColor()
   
   term.setTextColor(text)
   term.setBackgroundColor(back)
-  --return prevTxtColor, prevBackColor
+--  return prevTxtColor, prevBackColor
+  return colors.white, colors.black
 end

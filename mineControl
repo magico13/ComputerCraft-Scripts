@@ -14,8 +14,9 @@ local currentTool = "SELECT"
 local toolData = {}
 
 local waypoints = {}
+local caches = {}
 
---local turtleID = 4
+local selectedId = -1
 local turtleStats = {}
 
 
@@ -49,6 +50,7 @@ function resetScreen()
   
   showWorld()
   addButtons()
+  showInfo()
 end
 
 function addButtons()
@@ -63,6 +65,7 @@ function addButtons()
   m13.addButton("bMine", " ", changeTool, 1, 5, colors.red, colors.red, 1, 1)
   m13.addButton("bWayPoint", " ", changeTool, 1, 6, colors.lightblue, colors.lightBlue, 1, 1)
   m13.addButton("bGo", " ", changeTool, 1, 7, colors.green, colors.green, 1, 1)
+  m13.addButton("bCache", " ", changeTool, 1, 8, colors.yellow, colors.yellow, 1, 1)
 
   if currentTool == "MINE" then
     m13.addButton("bMineSend", "Send", sendMineInfo, m13.xRight("Send")-1, ty, colors.black, colors.red)
@@ -89,6 +92,8 @@ function changeTool(btnID)
     currentTool = "WAYPOINT"
   elseif btnID == "bGo" then
     currentTool = "GO"
+  elseif btnID == "bCache" then
+    currentTool = "CACHE"
   end
   clearTimer = os.startTimer(0.01)
 end
@@ -106,6 +111,7 @@ function loadWorldKnowledge()
     topLeft = vector.new(settings.topLeft.x, settings.topLeft.y, settings.topLeft.z)
     curY = settings.topLeft.y
     waypoints = settings.waypoints
+    caches = settings.caches
   end
 end
 
@@ -118,6 +124,7 @@ function saveWorldKnowledge()
   settings = {}
   settings["topLeft"] = topLeft
   settings["waypoints"] = waypoints
+  settings["caches"] = caches
   f.write(textutils.serialize(settings))
   f.close()
 end
@@ -147,17 +154,12 @@ function showWorld()
         color = colors.gray
       end
       
-      if redmsg.VectorInTable(waypoints, pos) then --its a waypoint
+      if redmsg.VectorInTable(waypoints, pos) then --it's a waypoint
           color = colors.lightBlue
       end
-      
-      for index, tData in pairs(turtleStats) do
-        if tData.position.x == pos.x and tData.position.z == pos.z then
-          if tData.position.y > pos.y then txt = "^"
-          elseif tData.position.y < pos.y then txt = "v"
-          end
-          color = getTurtleStatusColor(index)
-        end
+
+      if redmsg.VectorInTable(caches, pos) then --it's a cache
+        color = colors.yellow
       end
       
       for index, data in pairs(ToMine) do
@@ -166,28 +168,48 @@ function showWorld()
           break
         end
       end
-      
+
+      for index, tData in pairs(turtleStats) do
+        if tData.position.x == pos.x and tData.position.z == pos.z then
+          if tData.position.y > pos.y then txt = "^"
+          elseif tData.position.y < pos.y then txt = "v"
+          else txt = index
+          end
+          color = getTurtleStatusColor(index)
+        end
+      end
+
       for index, data in pairs(MineBlocks) do
         if data.x == pos.x and data.y == pos.y and data.z == pos.z then
           color = colors.red
           break
         end
       end
-      
-      
-      
+
       local preTxt, preBack = m13.setColors(colorTxt, color)
       term.write(txt)
       m13.setColors(preTxt, preBack)
     end
   end
-  
+end
+
+function showInfo()
+  -- In the bottom left, show selected turtle id and fuel level
+  if selectedId >= 0 then
+    tData = turtleStats[selectedId]
+    occupiedSlots = 0
+    for slot=1,16 do
+      if tData.inventory and tonumber(tData.inventory[slot]) > 0 then occupiedSlots = occupiedSlots + 1 end
+    end
+    txt = "ID:"..selectedId.." F:"..tData.fuel.." I:"..occupiedSlots
+    m13.writeAt(txt, 20, 1)
+  end
 end
 
 function getTurtleStatusColor(tID)
   local tData = turtleStats[tID]
   local color = colors.green
-  if tData.busy == "yes" then color = colors.yellow end
+  if tData.busy == 1 then color = colors.yellow end
   if tData.missing then color = colors.red end
   return color
 end
@@ -195,7 +217,8 @@ end
 function sendMineInfo(btnID)
   --send the list of blocks to mine to the closest turtle
   if not MineBlocks[1] then return end
-  local closest = findClosestTurtle(MineBlocks[1])
+  local closest = selectedId
+  if closest < 0 then closest = findClosestTurtle(MineBlocks[1]) end
   if closest >= 0 then
     redmsg.CreateAndSend(closest, "MINE:MINE", textutils.serialize(MineBlocks))
     JoinLists(ToMine, MineBlocks)
@@ -212,11 +235,11 @@ function JoinLists(final, other)
   end
 end
 
-function findClosestTurtle(block) -- eventually add ability to track if busy
+function findClosestTurtle(block)
   closest = 9999999
   closestID = -1
   for k,v in pairs(turtleStats) do
-    if v.busy ~= "yes" and not v.missing and minDist(block, v.position) < closest then
+    if v.busy == 0 and not v.missing and minDist(block, v.position) < closest then
       closest = minDist(block, v.position)
       closestID = k
     end
@@ -237,7 +260,7 @@ function UpdateTurtleData(tID, tData)
     turtleStats[tID] = {
       ["position"] = vector.new(0, 0, 0),
       ["fuel"] = 0,
-      ["busy"]="no",
+      ["busy"]= 0,
       ["inventory"]={},
       ["lastUpdate"]=0,
       ["missing"]=false,
@@ -249,7 +272,7 @@ function UpdateTurtleData(tID, tData)
   if tData.fuel then
     turtleStats[tID].fuel = tonumber(tData.fuel)
   end
-  if tData.busy then turtleStats[tID].busy = tData.busy end
+  if tData.busy then turtleStats[tID].busy = tonumber(tData.busy) end
   if tData.inventory then
     for i=1,16 do
       if tData.inventory[i] then
@@ -291,10 +314,18 @@ function selectTurtle(name)
   print("selecting "..name )
   local id = string.sub(name, string.find(name, ":")+1)
   id = tonumber(id)
+  selectedId = id
   --center the screen on the turtle
   topLeft = vector.new(math.floor(turtleStats[id].position.x - (tx-2)/2), turtleStats[id].position.y, math.floor(turtleStats[id].position.z - (ty-2)/2))
   curY = topLeft.y
   resetScreen()
+end
+
+function CreateHeartbeatBody()
+  local totalTable = {}
+  totalTable.waypoints = waypoints
+  totalTable.caches = caches
+  return textutils.serialize(totalTable)
 end
 
 -- MAIN --
@@ -319,7 +350,7 @@ print("Contacting turtles...")
 
 --get all turtles that are ready to go
 --send out a request
-redmsg.CreateAndSend(-1, "MINE:INITIALIZE", "", { "NOSAVE", "NOCONFIRM" } )
+redmsg.CreateAndSend(-1, "MINE:INITIALIZE", CreateHeartbeatBody(), { "NOSAVE", "NOCONFIRM" } )
 local message = redmsg.ReceiveMessage(1)
 while message do
   tID, sID, subj, body = redmsg.GetComponents(message)
@@ -346,7 +377,18 @@ while run do
         if a3 > 1 and a3 < ty then
           --definitely within the area
           if currentTool == "SELECT" then -- select a block/turtle
-            
+            local pos = getWorldPosition(a2, a3)
+            selectedId = -1
+            for index, tData in pairs(turtleStats) do
+              if tData.position.x == pos.x and tData.position.z == pos.z then
+                if tData.position.y == pos.y then
+                  -- selected a turtle
+                  selectedId = index
+                  break
+                end
+              end
+            end
+            resetScreen()
           elseif currentTool == "CLEAR" then -- set the block to cleared
             if a1 == 1 then
               world[getWorldPosition(a2, a3):tostring()] = true
@@ -413,15 +455,31 @@ while run do
             QueueSave(5)
           elseif currentTool == "GO" then -- move to the selected space (must be CLEARed first)
             local pos = getWorldPosition(a2, a3)
-           -- if world[pos] then --must be cleared
-              local totalTable = {}
-              totalTable.tgt = pos
-              totalTable.waypoints = waypoints
-              local closestID = findClosestTurtle(pos)
-              if closestID >= 0 then
-                redmsg.CreateAndSend(closestID, "MINE:GO", textutils.serialize(totalTable))
+            -- if world[pos] then --must be cleared
+            local totalTable = {}
+            totalTable.tgt = pos
+            totalTable.waypoints = waypoints
+            local closestID = selectedId
+            if closestID < 0 then closestID = findClosestTurtle(pos) end
+            if closestID >= 0 then
+              redmsg.CreateAndSend(closestID, "MINE:GO", textutils.serialize(totalTable))
+            end
+            -- end
+          elseif currentTool == "CACHE" then -- set the block as a cache
+            local pos = getWorldPosition(a2, a3)
+            if a1 == 1 then
+              if not redmsg.VectorInTable(caches, pos) then
+                table.insert(caches, pos)
+                resetScreen()
               end
-         --   end
+            else
+              local index = redmsg.VectorInTable(caches, pos)
+              if index then
+                table.remove(caches, index)
+                resetScreen()
+              end
+            end
+            QueueSave(5)
           end
         end
       end
@@ -438,7 +496,7 @@ while run do
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
         resetScreen()
         QueueSave(5)
-      elseif subject == "BlockMined" then
+      elseif subject == "MINE:MINED" then
         local pos = textutils.unserialize(body)
         world[vector.new(pos.x, pos.y, pos.z):tostring()] = true
         local index = redmsg.VectorInTable(ToMine, pos)
@@ -481,9 +539,9 @@ while run do
     if a1 == heartbeatTimer then
       --send update request
       for i, t in pairs(turtleStats) do 
-        if redmsg.CreateAndSend(i, "MINE:HEARTBEAT", "", { "NOSAVE" }) then
+        if redmsg.CreateAndSend(i, "MINE:HEARTBEAT", CreateHeartbeatBody(), { "NOSAVE" }) then
           --we just got a reply, so we should listen for the full update
-          local message = redmsg.ReceiveMessage(0.5) --for some reason this isn't returning a response
+          local message = redmsg.ReceiveMessage(2) --for some reason this isn't returning a response
           tgtID, sID, subject, body = redmsg.GetComponents(message)
           --redmsg.Print(message)
           if tgtID == os.getComputerID() then
@@ -511,4 +569,3 @@ end
 
 saveWorldKnowledge()
 redmsg.Finalize(modemSide)
-
