@@ -110,6 +110,7 @@ end
 
 function DropOffAtCache()
   -- When the inventory is too full, we have to drop stuff off at the closest cache
+  print("Dropping off at cache")
   local pos = lps.locateVec()
   if not caches_c then return end
   local closest = caches_c[1]
@@ -126,12 +127,13 @@ function DropOffAtCache()
   if lps.goWaypointsClosest(tgt, waypoinst_c) then
     DumpInventoryBelow()
   end
-  randVec = vector.new(math.random(6)-3, math.random(3), math.random(6)-3)
+  --randVec = vector.new(math.random(5)-3, math.random(2), math.random(5)-3)
   -- move somewhere else
-  lps.goVec(tgt + randVec)
+  --lps.goVec(tgt + randVec)
 end
 
 function DumpInventoryBelow()
+  print("Dumping inventory")
   for slot=1,16 do
     turtle.select(slot)
     turtle.dropDown()
