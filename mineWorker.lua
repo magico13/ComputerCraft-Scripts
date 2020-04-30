@@ -120,10 +120,9 @@ function MineBlocks(blocks)
       
       table.insert(lastAttempts, newClosest)
       lps.goWaypointsClosest(newClosest, waypoints_c, 10)
-
-      n = table.getn(blocks)
       --lps.goVec(newClosest, 10) -- go to the closest block
     end --if not nextToABlock
+    n = table.getn(blocks)
   end
   return true
 end
