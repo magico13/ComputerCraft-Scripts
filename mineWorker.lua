@@ -19,7 +19,9 @@ function MineBlocks(blocks)
     local pos = lps.locateVec()
     for _i = n,1,-1 do --loop backwards to handle nilling any mined blocks
       local block = blocks[_i]
-      if lps.minDist(pos, block) == 1 then --it's next to us
+      local d = lps.minDist(pos, block)
+      if d == 0 then blocks[_i] = 0 --if we are in the block then we mined it
+      elseif lps.minDist(pos, block) == 1 then --it's next to us
         if block.y > pos.y then --it's up
           while turtle.detectUp() do --handle gravel
             turtle.digUp()
