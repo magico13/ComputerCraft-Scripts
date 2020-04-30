@@ -3,14 +3,15 @@ local isBusy = 0
 local waypoints_c = {}
 local caches_c = {}
 
-function SendBlockMined(tgt, block)
-  redmsg.CreateAndSend(tgt, "MINE:MINED", textutils.serialize(block), { "NOSAVE" })
+function SendBlocksMined(tgt, blocks)
+  redmsg.CreateAndSend(tgt, "MINE:MINED", textutils.serialize(blocks), { "NOSAVE" })
 end
 
 
 function MineBlocks(blocks)
   local lastAttempts = {}
   local mineDelay = 0.5
+  local recentlyMined = {}
   while table.getn(blocks) > 0 do
     toRemove = 0
     nextToABlock = false
@@ -53,7 +54,7 @@ function MineBlocks(blocks)
         end
         nextToABlock = true
         toRemove = _i
-        SendBlockMined(sender, block)
+        table.insert(recentlyMined, block)
         lastAttempts = {}
         break
       end
@@ -61,6 +62,12 @@ function MineBlocks(blocks)
     if nextToABlock and toRemove > 0 then
       table.remove(blocks, toRemove)
     end
+
+    -- We've mined all the blocks around us, update controller
+    -- This sends less packets than doing it per block
+    SendBlocksMined(sender, recentlyMined)
+    recentlyMined = {}
+
     if InventorySlotsUsed() == 16 then
       DropOffAtCache()
     elseif not nextToABlock then
