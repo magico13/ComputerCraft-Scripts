@@ -12,11 +12,13 @@ function MineBlocks(blocks)
   local lastAttempts = {}
   local mineDelay = 0.5
   local recentlyMined = {}
-  while table.getn(blocks) > 0 do
+  local n = table.getn(blocks)
+  while n > 0 do
     toRemove = {}
     nextToABlock = false
     local pos = lps.locateVec()
-    for _i, block in pairs(blocks) do
+    for _i = n,1,-1 do --loop backwards to handle nilling any mined blocks
+      local block = blocks[_i]
       if lps.minDist(pos, block) == 1 then --it's next to us
         if block.y > pos.y then --it's up
           while turtle.detectUp() do --handle gravel
@@ -117,6 +119,8 @@ function MineBlocks(blocks)
       
       table.insert(lastAttempts, newClosest)
       lps.goWaypointsClosest(newClosest, waypoints_c, 10)
+
+      n = table.getn(blocks)
       --lps.goVec(newClosest, 10) -- go to the closest block
     end --if not nextToABlock
   end
