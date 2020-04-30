@@ -67,22 +67,18 @@ function MineBlocks(blocks)
         return (t[i]~=nil)
       end);
       print(table.getn(blocks).." blocks remaining")
-      -- n = table.getn(blocks)
-      -- for i=1,n do
-      --   if blocks[i] ~= nil then 
-      -- end
-      -- table.remove(blocks, toRemove)
+      -- We've mined all the blocks around us, update controller
+      -- This sends less packets than doing it per block
+      SendBlocksMined(sender, recentlyMined)
+      recentlyMined = {}
+      SendUpdate(_lastID)
     end
 
-    -- We've mined all the blocks around us, update controller
-    -- This sends less packets than doing it per block
-    SendBlocksMined(sender, recentlyMined)
-    recentlyMined = {}
-    SendUpdate(_lastID)
+    n = table.getn(blocks)
 
     if InventorySlotsUsed() == 16 then
       DropOffAtCache()
-    elseif not nextToABlock then
+    elseif not nextToABlock and n > 0 then
       --we need to move
       --find the closest block
       local closest = blocks[1]
@@ -123,7 +119,7 @@ function MineBlocks(blocks)
       lps.goWaypointsClosest(newClosest, waypoints_c, 10)
       --lps.goVec(newClosest, 10) -- go to the closest block
     end --if not nextToABlock
-    n = table.getn(blocks)
+    
   end
   return true
 end
