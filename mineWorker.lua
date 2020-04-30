@@ -13,7 +13,7 @@ function MineBlocks(blocks)
   local mineDelay = 0.5
   local recentlyMined = {}
   while table.getn(blocks) > 0 do
-    toRemove = 0
+    toRemove = {}
     nextToABlock = false
     local pos = lps.locateVec()
     for _i, block in pairs(blocks) do
@@ -53,14 +53,22 @@ function MineBlocks(blocks)
           end
         end
         nextToABlock = true
-        toRemove = _i
+        blocks[_i] = nil
         table.insert(recentlyMined, block)
         lastAttempts = {}
-        break
+        --break --don't break, we might be next to other blocks
       end
     end
-    if nextToABlock and toRemove > 0 then
-      table.remove(blocks, toRemove)
+    if nextToABlock then
+      --compact the table by removing nil values
+      ArrayRemove(blocks, function(t, i, j)
+        return (t[i]~=nil)
+      end);
+      -- n = table.getn(blocks)
+      -- for i=1,n do
+      --   if blocks[i] ~= nil then 
+      -- end
+      -- table.remove(blocks, toRemove)
     end
 
     -- We've mined all the blocks around us, update controller
@@ -154,6 +162,26 @@ function InventorySlotsUsed()
     if turtle.getItemCount(slot) > 0 then used = used + 1 end
  end
  return used
+end
+
+function ArrayRemove(t, fnKeep)
+  -- https://stackoverflow.com/questions/12394841/safely-remove-items-from-an-array-table-while-iterating
+  local j, n = 1, #t;
+
+  for i=1,n do
+      if (fnKeep(t, i, j)) then
+          -- Move i's kept value to j's position, if it's not already there.
+          if (i ~= j) then
+              t[j] = t[i];
+              t[i] = nil;
+          end
+          j = j + 1; -- Increment position of where we'll place the next kept value.
+      else
+          t[i] = nil;
+      end
+  end
+
+  return t;
 end
 
 function SendRegister(tgtID)
