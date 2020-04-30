@@ -63,9 +63,12 @@ function MineBlocks(blocks)
     end
     if nextToABlock then
       --compact the table by removing nil values
-      ArrayRemove(blocks, function(t, i, j)
-        return (t[i]~=nil)
-      end);
+      for i=n,1,-1 do
+        if blocks[i] == nil then table.remove(blocks, i) end
+      end
+      -- ArrayRemove(blocks, function(t, i, j)
+      --   return (t[i]~=nil)
+      -- end);
       print(table.getn(blocks).." blocks remaining")
       -- We've mined all the blocks around us, update controller
       -- This sends less packets than doing it per block
