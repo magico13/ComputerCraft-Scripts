@@ -499,7 +499,7 @@ while run do
         QueueSave(5)
       elseif subject == "MINE:MINED" then
         local blocks = textutils.unserialize(body)
-        for pos in blocks do
+        for i, pos in pairs(blocks) do
           world[vector.new(pos.x, pos.y, pos.z):tostring()] = true
           local index = redmsg.VectorInTable(ToMine, pos)
           if index then
