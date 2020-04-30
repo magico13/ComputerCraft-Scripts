@@ -55,8 +55,8 @@ function MineBlocks(blocks)
           end
         end
         nextToABlock = true
-        blocks[_i] = nil
         table.insert(recentlyMined, block)
+        blocks[_i] = nil
         lastAttempts = {}
         --break --don't break, we might be next to other blocks
       end
@@ -66,6 +66,7 @@ function MineBlocks(blocks)
       ArrayRemove(blocks, function(t, i, j)
         return (t[i]~=nil)
       end);
+      print(table.getn(blocks).." blocks remaining")
       -- n = table.getn(blocks)
       -- for i=1,n do
       --   if blocks[i] ~= nil then 
