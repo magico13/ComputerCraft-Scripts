@@ -1,4 +1,4 @@
-
+local _lastID = -1
 local isBusy = 0
 local waypoints_c = {}
 local caches_c = {}
@@ -287,8 +287,6 @@ end
 math.randomseed(os.time())
 print("Initialized")
 
-local _lastID = -1
-
 while true do
   print("Waiting for message...")
   isBusy = 0
@@ -306,7 +304,7 @@ while true do
   end
   
   if target == os.getComputerID() then
-    _lastID = sender
+    _lastID = tonumber(sender)
     -- sent to us specifically
     if subject == "MINE:GO" then
       tgtTable = textutils.unserialize(body)
