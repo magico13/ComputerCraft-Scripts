@@ -78,6 +78,7 @@ function MineBlocks(blocks)
     -- This sends less packets than doing it per block
     SendBlocksMined(sender, recentlyMined)
     recentlyMined = {}
+    SendUpdate(_lastID)
 
     if InventorySlotsUsed() == 16 then
       DropOffAtCache()
@@ -305,6 +306,7 @@ while true do
   end
   
   if target == os.getComputerID() then
+    _lastID = sender
     -- sent to us specifically
     if subject == "MINE:GO" then
       tgtTable = textutils.unserialize(body)
