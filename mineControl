@@ -197,10 +197,10 @@ function showInfo()
   -- In the bottom left, show selected turtle id and fuel level
   if selectedId >= 0 then
     tData = turtleStats[selectedId]
-    occupiedSlots = 0
-    for slot=1,16 do
-      if tData.inventory and tonumber(tData.inventory[slot]) > 0 then occupiedSlots = occupiedSlots + 1 end
-    end
+    occupiedSlots = tData.inventory
+    -- for slot=1,16 do
+    --   if tData.inventory and tonumber(tData.inventory[slot]) > 0 then occupiedSlots = occupiedSlots + 1 end
+    -- end
     txt = "ID:"..selectedId.." F:"..tData.fuel.." I:"..occupiedSlots
     m13.writeAt(txt, 20, 1)
   end
@@ -261,7 +261,7 @@ function UpdateTurtleData(tID, tData)
       ["position"] = vector.new(0, 0, 0),
       ["fuel"] = 0,
       ["busy"]= 0,
-      ["inventory"]={},
+      ["inventory"]=0,
       ["lastUpdate"]=0,
       ["missing"]=false,
     }
@@ -274,11 +274,12 @@ function UpdateTurtleData(tID, tData)
   end
   if tData.busy then turtleStats[tID].busy = tonumber(tData.busy) end
   if tData.inventory then
-    for i=1,16 do
-      if tData.inventory[i] then
-        turtleStats[tID].inventory[i] = tData.inventory[i]
-      end
-    end
+    turtleStats[tID].inventory = tData.inventory
+    -- for i=1,16 do
+    --   if tData.inventory[i] then
+    --     turtleStats[tID].inventory[i] = tData.inventory[i]
+    --   end
+    -- end
   end
   
   turtleStats[tID].lastUpdate = GetAbsoluteTicks()

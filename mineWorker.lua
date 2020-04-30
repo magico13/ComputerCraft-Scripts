@@ -166,11 +166,11 @@ function CompileData()
   redData.fuel = turtle.getFuelLevel()
   redData.position = lps.locateVec()
   redData.busy = isBusy
-  redData.inventory = {}
+  redData.inventory = InventorySlotsUsed()
   
-  for slot=1,16 do
-     table.insert(redData.inventory, turtle.getItemCount(slot))
-  end
+  -- for slot=1,16 do
+  --    table.insert(redData.inventory, turtle.getItemCount(slot))
+  -- end
   
   return redData
 end
