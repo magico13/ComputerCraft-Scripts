@@ -224,7 +224,7 @@ function sendMineInfo(btnID)
     JoinLists(ToMine, MineBlocks)
     MineBlocks = {}
   end
-  resetScreen()
+  clearTimer = os.startTimer(0.01)
 end
 
 --joins "other" table into "final" table
@@ -319,7 +319,7 @@ function selectTurtle(name)
   --center the screen on the turtle
   topLeft = vector.new(math.floor(turtleStats[id].position.x - (tx-2)/2), turtleStats[id].position.y, math.floor(turtleStats[id].position.z - (ty-2)/2))
   curY = topLeft.y
-  resetScreen()
+  clearTimer = os.startTimer(0.1)
 end
 
 function CreateHeartbeatBody()
@@ -389,15 +389,14 @@ while run do
                 end
               end
             end
-            resetScreen()
+            clearTimer = os.startTimer(0.1)
           elseif currentTool == "CLEAR" then -- set the block to cleared
             if a1 == 1 then
               world[getWorldPosition(a2, a3):tostring()] = true
-              resetScreen()
             else
               world[getWorldPosition(a2, a3):tostring()] = false
-              resetScreen()
             end
+            clearTimer = os.startTimer(0.1)
             QueueSave(5)
           elseif currentTool == "MINE" then -- designate the block to be mined
             local pos = getWorldPosition(a2, a3)
@@ -431,12 +430,12 @@ while run do
                -- table.insert(MineBlocks, pos)
                -- resetScreen()
               --end
-              resetScreen()
+              clearTimer = os.startTimer(0.1)
             else
               local index = redmsg.VectorInTable(MineBlocks, pos)
               if index then
                 table.remove(MineBlocks, index)
-                resetScreen()
+                clearTimer = os.startTimer(0.1)
               end
             end
           elseif currentTool == "WAYPOINT" then -- set the block as a waypoint
@@ -444,13 +443,13 @@ while run do
             if a1 == 1 then
               if not redmsg.VectorInTable(waypoints, pos) then
                 table.insert(waypoints, pos)
-                resetScreen()
+                clearTimer = os.startTimer(0.1)
               end
             else
               local index = redmsg.VectorInTable(waypoints, pos)
               if index then
                 table.remove(waypoints, index)
-                resetScreen()
+                clearTimer = os.startTimer(0.1)
               end
             end
             QueueSave(5)
@@ -471,13 +470,13 @@ while run do
             if a1 == 1 then
               if not redmsg.VectorInTable(caches, pos) then
                 table.insert(caches, pos)
-                resetScreen()
+                clearTimer = os.startTimer(0.1)
               end
             else
               local index = redmsg.VectorInTable(caches, pos)
               if index then
                 table.remove(caches, index)
-                resetScreen()
+                clearTimer = os.startTimer(0.1)
               end
             end
             QueueSave(5)
@@ -495,7 +494,7 @@ while run do
     if tgtID == os.getComputerID() then
       if subject == "LPSUpdate" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        resetScreen()
+        clearTimer = os.startTimer(0.1)
         QueueSave(5)
       elseif subject == "MINE:MINED" then
         local blocks = textutils.unserialize(body)
@@ -506,11 +505,11 @@ while run do
             table.remove(ToMine, index)
           end
         end
-        resetScreen()
+        clearTimer = os.startTimer(0.1)
         QueueSave(5)
       elseif subject == "MINE:UPDATE" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        resetScreen() --not getting post work updates for some reason...
+        clearTimer = os.startTimer(0.1) --not getting post work updates for some reason...
         --print("got update")
         --redmsg.Print(message)
       end
@@ -564,7 +563,7 @@ while run do
         end
       end
       heartbeatTimer = os.startTimer(60)
-      resetScreen()
+      clearTimer = os.startTimer(0.1)
     end
   end
 end
