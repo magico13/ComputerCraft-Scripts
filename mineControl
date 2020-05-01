@@ -1,5 +1,7 @@
 local clearTimer = nil
+local clearTimerTimeout = 0.4
 local clearTimerTurtle = nil
+local clearTimerTurtleTimeout = 0.2
 local saveTimer = nil
 local heartbeatTimer = os.startTimer(60)
 local run = true
@@ -96,7 +98,7 @@ function changeTool(btnID)
   elseif btnID == "bCache" then
     currentTool = "CACHE"
   end
-  clearTimer = os.startTimer(0.5)
+  clearTimer = os.startTimer(clearTimerTimeout)
 end
 
 function loadWorldKnowledge()
@@ -225,7 +227,7 @@ function sendMineInfo(btnID)
     JoinLists(ToMine, MineBlocks)
     MineBlocks = {}
   end
-  clearTimer = os.startTimer(0.5)
+  clearTimer = os.startTimer(clearTimerTimeout)
 end
 
 --joins "other" table into "final" table
@@ -320,7 +322,7 @@ function selectTurtle(name)
   --center the screen on the turtle
   topLeft = vector.new(math.floor(turtleStats[id].position.x - (tx-2)/2), turtleStats[id].position.y, math.floor(turtleStats[id].position.z - (ty-2)/2))
   curY = topLeft.y
-  clearTimer = os.startTimer(0.5)
+  clearTimer = os.startTimer(clearTimerTimeout)
 end
 
 function CreateHeartbeatBody()
@@ -390,14 +392,14 @@ while run do
                 end
               end
             end
-            clearTimer = os.startTimer(0.5)
+            clearTimer = os.startTimer(clearTimerTimeout)
           elseif currentTool == "CLEAR" then -- set the block to cleared
             if a1 == 1 then
               world[getWorldPosition(a2, a3):tostring()] = true
             else
               world[getWorldPosition(a2, a3):tostring()] = false
             end
-            clearTimer = os.startTimer(0.5)
+            clearTimer = os.startTimer(clearTimerTimeout)
             QueueSave(5)
           elseif currentTool == "MINE" then -- designate the block to be mined
             local pos = getWorldPosition(a2, a3)
@@ -431,12 +433,12 @@ while run do
                -- table.insert(MineBlocks, pos)
                -- resetScreen()
               --end
-              clearTimer = os.startTimer(0.5)
+              clearTimer = os.startTimer(clearTimerTimeout)
             else
               local index = redmsg.VectorInTable(MineBlocks, pos)
               if index then
                 table.remove(MineBlocks, index)
-                clearTimer = os.startTimer(0.5)
+                clearTimer = os.startTimer(clearTimerTimeout)
               end
             end
           elseif currentTool == "WAYPOINT" then -- set the block as a waypoint
@@ -444,13 +446,13 @@ while run do
             if a1 == 1 then
               if not redmsg.VectorInTable(waypoints, pos) then
                 table.insert(waypoints, pos)
-                clearTimer = os.startTimer(0.5)
+                clearTimer = os.startTimer(clearTimerTimeout)
               end
             else
               local index = redmsg.VectorInTable(waypoints, pos)
               if index then
                 table.remove(waypoints, index)
-                clearTimer = os.startTimer(0.5)
+                clearTimer = os.startTimer(clearTimerTimeout)
               end
             end
             QueueSave(5)
@@ -471,13 +473,13 @@ while run do
             if a1 == 1 then
               if not redmsg.VectorInTable(caches, pos) then
                 table.insert(caches, pos)
-                clearTimer = os.startTimer(0.5)
+                clearTimer = os.startTimer(clearTimerTimeout)
               end
             else
               local index = redmsg.VectorInTable(caches, pos)
               if index then
                 table.remove(caches, index)
-                clearTimer = os.startTimer(0.5)
+                clearTimer = os.startTimer(clearTimerTimeout)
               end
             end
             QueueSave(5)
@@ -495,7 +497,7 @@ while run do
     if tgtID == os.getComputerID() then
       if subject == "LPSUpdate" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        clearTimerTurtle = os.startTimer(0.1)
+        clearTimerTurtle = os.startTimer(clearTimerTurtleTimeout)
         QueueSave(5)
       elseif subject == "MINE:MINED" then
         local blocks = textutils.unserialize(body)
@@ -506,11 +508,11 @@ while run do
             table.remove(ToMine, index)
           end
         end
-        clearTimerTurtle = os.startTimer(0.1)
+        clearTimerTurtle = os.startTimer(clearTimerTurtleTimeout)
         QueueSave(5)
       elseif subject == "MINE:UPDATE" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        clearTimerTurtle = os.startTimer(0.1) --not getting post work updates for some reason...
+        clearTimerTurtle = os.startTimer(clearTimerTurtleTimeout) --not getting post work updates for some reason...
         --print("got update")
         --redmsg.Print(message)
       end
@@ -564,7 +566,7 @@ while run do
         end
       end
       heartbeatTimer = os.startTimer(60)
-      clearTimer = os.startTimer(0.5)
+      clearTimer = os.startTimer(clearTimerTimeout)
     end
   end
 end

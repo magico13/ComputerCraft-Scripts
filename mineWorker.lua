@@ -4,7 +4,7 @@ local waypoints_c = {}
 local caches_c = {}
 
 function SendBlocksMined(tgt, blocks)
-  redmsg.CreateAndSend(tgt, "MINE:MINED", textutils.serialize(blocks), { "NOSAVE" })
+  redmsg.CreateAndSend(tgt, "MINE:MINED", textutils.serialize(blocks), { "NOSAVE", "NOCONFIRM" })
 end
 
 
