@@ -108,7 +108,8 @@ function SendRedMsgUpdate()
 end
 
 -- moves the turtle forward, returns success
-function forward()
+function forward(depth)
+  if not depth then depth = 0 end
   if not IsInitialized() then 
     if not fileInitialize() then return false end
   end
@@ -126,6 +127,9 @@ function forward()
     end
     updateFile()
     return true
+  elseif not turtle.detect() and depth < 5 then
+    turtle.attack()
+    forward(depth+1)
   end
   return false
 end
