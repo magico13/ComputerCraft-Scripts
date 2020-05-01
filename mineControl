@@ -1,4 +1,5 @@
 local clearTimer = nil
+local clearTimerTurtle = nil
 local saveTimer = nil
 local heartbeatTimer = os.startTimer(60)
 local run = true
@@ -494,7 +495,7 @@ while run do
     if tgtID == os.getComputerID() then
       if subject == "LPSUpdate" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        clearTimer = os.startTimer(0.5)
+        clearTimerTurtle = os.startTimer(0.1)
         QueueSave(5)
       elseif subject == "MINE:MINED" then
         local blocks = textutils.unserialize(body)
@@ -505,11 +506,11 @@ while run do
             table.remove(ToMine, index)
           end
         end
-        clearTimer = os.startTimer(0.5)
+        clearTimerTurtle = os.startTimer(0.1)
         QueueSave(5)
       elseif subject == "MINE:UPDATE" then
         UpdateTurtleData(tonumber(sID), textutils.unserialize(body))
-        clearTimer = os.startTimer(0.5) --not getting post work updates for some reason...
+        clearTimerTurtle = os.startTimer(0.1) --not getting post work updates for some reason...
         --print("got update")
         --redmsg.Print(message)
       end
@@ -531,7 +532,7 @@ while run do
   end
   
   if event == "timer" then
-    if a1 == clearTimer then
+    if a1 == clearTimer or a1 == clearTimerTurtle then
       resetScreen()
     end
     if a1 == saveTimer then
