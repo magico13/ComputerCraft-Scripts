@@ -129,7 +129,7 @@ function forward(depth)
     return true
   elseif not turtle.detect() and depth < 5 then
     turtle.attack()
-    forward(depth+1)
+    return forward(depth+1)
   end
   return false
 end
@@ -482,7 +482,7 @@ function goWaypointsClosest(tgt, waypoints, pathFindTimes)
       end
     end
     if not goVec(vector.new(closest.x, closest.y, closest.z), pathFindTimes) then return false end
-    _v = (data.position - tgt)
+    _v = (vector.new(data.position) - vector.new(tgt))
     going = (_v:length() ~= 0)
   end
   return true
