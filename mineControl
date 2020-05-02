@@ -2,9 +2,12 @@ local clearTimer = nil
 local clearTimerActive = false
 local clearTimerTimeout = 0.5
 local clearTimerTurtleTimeout = 0.3
+local lastClearTimer = 0
 local saveTimer = nil
 local saveTimerActive = false
+local lastSaveTimer = 0
 local heartbeatTimer = os.startTimer(60)
+
 local run = true
 local tx, ty = term.getSize()
 local curY = 10
@@ -313,6 +316,7 @@ function QueueSave(t)
   if not saveTimerActive then
     saveTimer = os.startTimer(t)
     saveTimerActive = true
+    lastSaveTimer = os.clock()
   end
 end
 
@@ -320,6 +324,7 @@ function QueueRefresh(t)
   if not clearTimerActive then
     clearTimer = os.startTimer(t)
     clearTimerActive = true
+    lastClearTimer = os.clock()
   end
 end
 
@@ -378,6 +383,9 @@ sleep(0.2)
 resetScreen()
 
 while run do
+  if clearTimerActive and os.clock() - lastClearTimer > 5 then clearTimerActive = false end
+  if saveTimerActive and os.clock() - lastSaveTimer > 10 then saveTimerActive = false end
+
   local event, a1, a2, a3 = os.pullEvent()
   if event == "mouse_click" then
     local btnName = m13.buttonClicked(a2, a3)
