@@ -1,7 +1,9 @@
 local clearTimer = nil
-local clearTimerTimeout = 0.4
-local clearTimerTurtleTimeout = 0.2
+local clearTimerActive = false
+local clearTimerTimeout = 0.5
+local clearTimerTurtleTimeout = 0.3
 local saveTimer = nil
+local saveTimerActive = false
 local heartbeatTimer = os.startTimer(60)
 local run = true
 local tx, ty = term.getSize()
@@ -308,14 +310,16 @@ function GetAbsoluteTicks(day, t)
 end
 
 function QueueSave(t)
-  if not saveTimer then
+  if not saveTimerActive then
     saveTimer = os.startTimer(t)
+    saveTimerActive = true
   end
 end
 
 function QueueRefresh(t)
-  if not clearTimer then
+  if not clearTimerActive then
     clearTimer = os.startTimer(t)
+    clearTimerActive = true
   end
 end
 
@@ -542,10 +546,12 @@ while run do
     if a1 == clearTimer then
       resetScreen()
       clearTimer = nil
+      clearTimerActive = false
     end
     if a1 == saveTimer then
       saveWorldKnowledge()
       saveTimer = nil
+      saveTimerActive = false
     end
     if a1 == heartbeatTimer then
       --send update request
