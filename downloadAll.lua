@@ -17,7 +17,7 @@ fileListCom = {
   --"testGetMsg.lua",
   --"mailServer.lua",
   "m13",
-  "mineControl.lua",
+  "mineControl",
 }
 
 

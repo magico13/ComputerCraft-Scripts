@@ -1,0 +1,130 @@
+if not os.loadAPI("m13") then
+    print("Error loading m13 API")
+    return
+end
+if not os.loadAPI("redmsg") then
+    print("Error loading redmsg API")
+    return
+end
+
+local xSize, ySize = term.getSize()
+
+local accessAllowed = {
+    "magico13",
+    "njh621"
+}
+
+local facilityName = "Solstone Energy: Facility One"
+local doorSide = "left"
+local powerSide = "back"
+
+function successfulEntry(user)
+    userLoop(user)
+end
+
+
+local doorOpen = redstone.getOutput(doorSide)
+local powerActivated = redstone.getOutput(powerSide)
+
+function toggleDoor()
+    doorOpen = not doorOpen
+    redstone.setOutput(doorSide, doorOpen)
+    m13.popup(doorStateText(doorOpen))
+    sleep(1)
+end
+
+function togglePower()
+    powerActivated = not powerActivated
+    redstone.setOutput(powerSide, powerActivated)
+    m13.popup(powerStateText(powerActivated))
+    sleep(1)
+end
+
+function doorStateText(state)
+    txt = "Door "
+    if state then txt = txt.."Opened"
+    else txt = txt.."Closed"
+    end
+    return txt
+end
+
+function powerStateText(state)
+    txt = "Power "
+    if state then txt = txt.."Activated"
+    else txt = txt.."Deactivated"
+    end
+    return txt
+end
+
+function userLoop(user)
+    local loggedIn = true
+    local fnSelected = 1
+    local funcs = {
+        "Toggle Door",
+        "Toggle Power",
+        "Logout"
+    }
+    local listStart = 7
+    while loggedIn do
+        m13.reset()
+        --print(ySize)
+        m13.printCenter(facilityName, 2)
+        m13.printCenter("Logged in as: "..user, ySize-1)
+        m13.printCenter(doorStateText(doorOpen), 5)
+        m13.printCenter(powerStateText(powerActivated), 6)
+        for i, f in pairs(funcs) do
+            txt = f
+            if i == fnSelected then txt = ">"..txt.."<" end
+            m13.printCenter(txt, listStart+i)
+        end
+        m13.makeBorder()
+
+        local resp = listenForKeys()
+        if resp ~= 0 then -- up/down keys
+            fnSelected = fnSelected - 1 + resp
+            fnSelected = fnSelected % table.getn(funcs)
+            fnSelected = fnSelected + 1
+        else -- they pressed enter
+            if fnSelected == 1 then toggleDoor()
+            elseif fnSelected == 2 then togglePower()
+            elseif fnSelected == 3 then loggedIn = false
+            end
+        end
+    end
+    m13.reset()
+    m13.popup("Goodbye "..user)
+end
+
+
+function listenForKeys()
+    while true do
+        local event, a1, a2, a3 = os.pullEvent()
+        if event == "key" then
+            if a1 == keys.up then return -1
+            elseif a1 == keys.down then return 1
+            elseif a1 == keys.enter then return 0
+            end
+        end    
+    end
+end
+
+while true do
+    m13.reset()
+    
+    m13.printCenter(facilityName, 2)
+    m13.printCenter("Access is restricted to", 4)
+    m13.printCenter("Authorized Personel Only", 5)
+    m13.printCenter("Please Enter your ID: ", 7)
+    m13.makeBorder()
+    m13.cPos(15, 8)
+
+    txt = io.read()
+    if m13.elementInTable(accessAllowed, txt) then
+        m13.popup("Welcome "..txt.."!")
+        sleep(1)
+        successfulEntry(txt)
+    else
+        m13.popup("Access Denied")
+    end
+    sleep(1)
+end
