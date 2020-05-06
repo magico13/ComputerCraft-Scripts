@@ -1,0 +1,141 @@
+local mSide = "back"
+local superSecretPassword = "missile"
+local siloState = false
+
+function initialize()
+  os.loadAPI("m13")
+  m13.resetConsole()
+  rednet.open(mSide)
+end
+
+function exit()
+  rednet.close(mSide)
+  m13.resetConsole()
+  rs.setOutput("left", false)
+end
+
+function communicate(cmd, args)
+  if not args then args=" " end
+  rednet.send(1, cmd.."::"..args)
+  _, msg = rednet.receive(.5)
+  return msg
+end
+
+function parseArgs(msg)
+  local i=1
+  local prev=0
+  local args = {}
+  while true do
+    local next = string.find(msg, "#", prev+1)
+    if next then
+      args[i]=string.sub(msg, prev+1, next-1)
+    else
+      args[i]=string.sub(msg, prev+1)
+    end
+    prev = next
+    if not prev then break end
+    i=i+1
+  end  
+  return args
+end
+
+function formatTargetData(data)
+  args = parseArgs(data)
+  return args[1].." "..args[2].." "..args[3]
+end
+
+function canLaunch()
+  return communicate("canLaunch") and siloState==true and communicate("getMissile") ~= "None"
+end
+
+function launchMissile()
+  m13.resetConsole()
+  m13.printCenter("Enter authorization key:", 6)
+  m13.writeAt("> ",10,7)
+  local key = read("*")
+  if key==superSecretPassword and canLaunch() then communicate("launch")
+  elseif siloState==false then m13.popup("Silo is closed!") sleep(1)
+  elseif key==superSecretPassword then m13.popup("Cannot launch missile!") sleep(1)
+  else m13.popup("Incorrect launch key!") sleep(1)
+  end
+end
+
+function toggleSilo(state)
+  if not state then state=not siloState end
+  rs.setOutput("left", state)
+  siloState = state
+end
+
+function menu()
+  m13.resetConsole()
+  m13.newButtons()
+  local launchColor = colors.red
+  if canLaunch() then launchColor = colors.lime end
+  m13.addButton("Launch", "launch", 0, 7, nil, 1, colors.white, launchColor)
+  m13.addButton("Set Target", "setTarget", 0, 8, nil, 1, colors.white, colors.cyan)
+  if siloState then m13.addButton("Close Silo", "toggleSilo", 0, 9, nil, 1, colors.white, colors.blue)
+  else
+    m13.addButton("Open Silo", "toggleSilo", 0, 9, 12, 1, colors.gray, colors.orange)
+  end
+  m13.addButton("Refresh Screen", "refresh", 0, 10, nil, 1, colors.white, colors.gray)
+  m13.addButton("Exit", "exit", 0, 11, nil, 1, colors.white, colors.gray)
+
+
+  m13.writeAt("Target: "..formatTargetData(communicate("getTarget")), 1, 1)
+  m13.writeAt("Silo open? "..tostring(siloState), m13.xRight("Silo open? "..tostring(siloState)), 1)
+  m13.writeAt("Can launch? "..tostring(canLaunch()), 1, 19)
+  missile = "Missile: "..communicate("getMissile")
+  m13.writeAt(missile, m13.xRight(missile), 19)
+
+  m13.cPos(1,1)
+end
+
+function setTarget(targ)
+while true do
+  m13.resetConsole()
+  m13.newButtons()
+  m13.addButton("X: "..targ[1], "xChange", 0, 7, m13.max({9, string.len("X: "..targ[1])+2}), 1, colors.white, colors.blue)
+  m13.addButton("Y: "..targ[2], "yChange", 0, 9, m13.max({9, string.len("Y: "..targ[2])+2}), 1, colors.white, colors.green)
+  m13.addButton("Z: "..targ[3], "zChange", 0, 11, m13.max({9, string.len("Z: "..targ[3])+2}), 1, colors.white, colors.red)
+  m13.addButton("Back", "back", 19, 13, nil, 1, colors.white, colors.gray)
+  m13.addButton("Accept", "accept", 27, 13, nil, 1, colors.black, colors.yellow)
+
+  for event, button, xClick, yClick in os.pullEvent do
+    if event == "mouse_click" then
+      local func = m13.getFunc(m13.buttonClicked(xClick,yClick))
+      if func == "back" then return
+      elseif func == "xChange" then targ[1] = changeCoord(targ[1]) break
+      elseif func == "yChange" then targ[2] = changeCoord(targ[2]) break
+      elseif func == "zChange" then targ[3] = changeCoord(targ[3]) break
+      elseif func == "accept" then communicate("setTarget", targ[1].."#"..targ[2].."#"..targ[3]) return
+      end
+    end
+  end
+end
+end
+
+function changeCoord(coord)
+  m13.resetConsole()
+  m13.printCenter("Old coordinate: "..tostring(coord), 8)
+  m13.writeAt("New coordinate: ", m13.xCenter("New coordinate: "), 9)
+  return tonumber(read())
+end
+
+-- Main --
+initialize()
+menu()
+for event, button, xClick, yClick in os.pullEvent do
+  if event == "mouse_click" then
+    --if button == 2 then break end
+    local func = m13.getFunc(m13.buttonClicked(xClick,yClick))
+    if func == "setTarget" then setTarget(parseArgs(communicate("getTarget")))
+    elseif func == "toggleSilo" then toggleSilo()
+    elseif func == "exit" then break
+    elseif func == "launch" then launchMissile() 
+    end
+    if func then menu() end
+  end
+end
+
+
+exit()

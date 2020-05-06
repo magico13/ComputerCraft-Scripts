@@ -1,0 +1,105 @@
+local mSide = "bottom"
+local launchSide = "right"
+local launcher
+local flaggedForHalt = false
+
+
+function initialize()
+  launcher = peripheral.wrap(launchSide)
+  rednet.open(mSide)
+end
+
+function shutDown()
+  rednet.close(mSide)
+end
+
+function setTarget(x, y, z)
+  launcher.setTarget(x,y,z)
+end
+
+function getTarget()
+  x,y,z = launcher.getTarget()
+  rednet.send(0, x.."#"..y.."#"..z)
+--  return {x,y,z}
+end
+
+function canLaunch()
+  rednet.send(0, tostring(launcher.canLaunch()))
+end
+
+function launch()
+  if launcher.canLaunch() then launcher.launch() end
+end
+
+function getMissile()
+  missile = launcher.getMissile()
+  if not missile then missile = "None" end
+  rednet.send(0, missile)
+end
+
+function waitForRednet()
+  local id, msg, dist = rednet.receive()
+  if id == 0 then process(msg) end
+end
+
+function process(msg)
+  local b = string.find(msg, "::")
+  local cmd = string.sub(msg, 0, b-1)
+  print(cmd)
+  
+  local i=1
+  local prev=b+1
+  local args = {}
+  while true do
+    local next = string.find(msg, "#", prev+1)
+    if next then
+      args[i]=string.sub(msg, prev+1, next-1)
+    else
+      args[i]=string.sub(msg, prev+1)
+    end
+    prev = next
+    print(args[i])
+    if not prev then break end
+    i=i+1
+  end  
+  
+  if cmd == "halt" then flaggedForHalt = true
+  elseif cmd == "setTarget" then 
+    if # args == 2 then
+      x = tonumber(args[1])
+      z = tonumber(args[2])
+      y = 0
+    elseif # args == 3 then
+      x = tonumber(args[1])
+      y = tonumber(args[2])
+      z = tonumber(args[3])
+    else
+      print("Incorrect number of arguments for setTarget!")
+      return
+    end
+    setTarget(x,y,z)
+  elseif cmd == "getTarget" then
+    getTarget()
+  elseif cmd == "canLaunch" then
+    canLaunch()
+  elseif cmd == "launch" then
+    launch()
+  elseif cmd == "getMissile" then
+    getMissile()
+  end
+  
+end
+
+
+
+-- main --
+initialize()
+
+--setTarget(1,0,1)
+
+while true do
+  waitForRednet()
+  if flaggedForHalt then break end
+end
+
+shutDown()
