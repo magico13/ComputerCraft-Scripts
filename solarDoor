@@ -6,6 +6,10 @@ if not os.loadAPI("redmsg") then
     print("Error loading redmsg API")
     return
 end
+if not os.loadAPI("ocs/apis/sensor") then
+    print("Error loading sensor API")
+    return
+end
 
 local xSize, ySize = term.getSize()
 
@@ -14,14 +18,14 @@ local accessAllowed = {
     "njh621"
 }
 
-local facilityName = "Solstone Energy: Facility One"
+local facilityName = "Solstone Energy: Sol Sands Facility"
 local doorSide = "left"
-local powerSide = "back"
+local powerSide = "top"
+local sensorSide = "back"
 
 function successfulEntry(user)
     userLoop(user)
 end
-
 
 local doorOpen = redstone.getOutput(doorSide)
 local powerActivated = redstone.getOutput(powerSide)
@@ -64,7 +68,7 @@ function userLoop(user)
         "Toggle Power",
         "Logout"
     }
-    local listStart = 7
+    local listStart = 8
     while loggedIn do
         m13.reset()
         --print(ySize)
@@ -72,6 +76,7 @@ function userLoop(user)
         m13.printCenter("Logged in as: "..user, ySize-1)
         m13.printCenter(doorStateText(doorOpen), 5)
         m13.printCenter(powerStateText(powerActivated), 6)
+        m13.printCenter("Current Power: "..getPowerDetails(icSensor, bbox).Stored.."EU", 7)
         for i, f in pairs(funcs) do
             txt = f
             if i == fnSelected then txt = ">"..txt.."<" end
@@ -107,6 +112,26 @@ function listenForKeys()
         end    
     end
 end
+
+function findIC2BlockByName(sens, name)
+    for k, v in pairs(sens.getTargets()) do
+        if v.RawName == name then return k end
+    end
+    return nil
+end
+
+function getPowerDetails(sens, key)
+    details = sens.getTargetDetails(key)
+    newDetails = {}
+    newDetails.Stored = details.Stored
+    newDetails.Capacity = details.Capacity
+    newDetails.Percentage = details.StoredPercentage
+    return newDetails
+end
+
+icSensor = sensor.wrap(sensorSide)
+bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
+if not bbox then print("BatBox not found") return end
 
 while true do
     m13.reset()
