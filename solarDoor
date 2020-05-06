@@ -70,13 +70,14 @@ function userLoop(user)
     }
     local listStart = 8
     while loggedIn do
+        pwr = getPowerDetails(icSensor, bbox)
         m13.reset()
         --print(ySize)
         m13.printCenter(facilityName, 2)
         m13.printCenter("Logged in as: "..user, ySize-1)
         m13.printCenter(doorStateText(doorOpen), 5)
         m13.printCenter(powerStateText(powerActivated), 6)
-        m13.printCenter("Current Power: "..getPowerDetails(icSensor, bbox).Stored.."EU", 7)
+        m13.printCenter("Stored: "..pwr.Stored.."EU".." ("..pwr.Percentage.."%)", 7)
         for i, f in pairs(funcs) do
             txt = f
             if i == fnSelected then txt = ">"..txt.."<" end
@@ -84,15 +85,17 @@ function userLoop(user)
         end
         m13.makeBorder()
 
-        local resp = listenForKeys()
-        if resp ~= 0 then -- up/down keys
-            fnSelected = fnSelected - 1 + resp
-            fnSelected = fnSelected % table.getn(funcs)
-            fnSelected = fnSelected + 1
-        else -- they pressed enter
-            if fnSelected == 1 then toggleDoor()
-            elseif fnSelected == 2 then togglePower()
-            elseif fnSelected == 3 then loggedIn = false
+        local resp = listenForKeys(1)
+        if resp then -- not timed out
+            if resp ~= 0 then -- up/down keys
+                fnSelected = fnSelected - 1 + resp
+                fnSelected = fnSelected % table.getn(funcs)
+                fnSelected = fnSelected + 1
+            else -- they pressed enter
+                if fnSelected == 1 then toggleDoor()
+                elseif fnSelected == 2 then togglePower()
+                elseif fnSelected == 3 then loggedIn = false
+                end
             end
         end
     end
@@ -101,7 +104,8 @@ function userLoop(user)
 end
 
 
-function listenForKeys()
+function listenForKeys(timeout)
+    timer = os.startTimer(timeout)
     while true do
         local event, a1, a2, a3 = os.pullEvent()
         if event == "key" then
@@ -109,6 +113,8 @@ function listenForKeys()
             elseif a1 == keys.down then return 1
             elseif a1 == keys.enter then return 0
             end
+        elseif event == "timer" then
+            if a1 == timer then return nil end
         end    
     end
 end
