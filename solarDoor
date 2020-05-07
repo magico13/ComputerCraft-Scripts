@@ -22,6 +22,7 @@ local facilityName = "Solstone Energy: Sol Sands Facility"
 local doorSide = "left"
 local powerSide = "top"
 local sensorSide = "back"
+local monitorSide = "right"
 
 function successfulEntry(user)
     userLoop(user)
@@ -70,6 +71,7 @@ function userLoop(user)
     }
     local listStart = 8
     while loggedIn do
+        updateMonitor(monitor, icSensor, bbox)
         pwr = getPowerDetails(icSensor, bbox)
         m13.reset()
         --print(ySize)
@@ -135,11 +137,24 @@ function getPowerDetails(sens, key)
     return newDetails
 end
 
-icSensor = sensor.wrap(sensorSide)
-bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
+function updateMonitor(monitor, sens, key)
+    term.redirect(monitor)
+    m13.reset()
+    details = getPowerDetails(sens, key)
+    m13.printCenter(details.Stored.." EU", 2)
+    m13.printCenter(details.Percentage.."%", 2)
+    term.restore()
+end
+
+local icSensor = sensor.wrap(sensorSide)
+local bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
 if not bbox then print("BatBox not found") return end
 
+local monitor = peripheral.wrap(monitorSide)
+monitor.setTextScale(1)
+
 while true do
+    updateMonitor(monitor, icSensor, bbox)
     m13.reset()
     
     m13.printCenter(facilityName, 2)
