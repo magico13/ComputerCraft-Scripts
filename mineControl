@@ -28,7 +28,6 @@ local turtleStats = {}
 
 
 local MineBlocks = {}
-local ToMine = {}
 
 
 function Exit()
@@ -47,6 +46,9 @@ function YChange(btnID)
 end
 
 function resetScreen()
+  local worldColors = {}
+  local texts = {}
+  calculateWorldForDisplay(worldColors, texts)
   m13.reset()
   --m13.makeBorder()
   
@@ -55,9 +57,9 @@ function resetScreen()
   
   m13.writeAt(currentTool, 1, ty)
   
-  showWorld()
   addButtons()
   showInfo()
+  showWorld(worldColors, texts)
 end
 
 function addButtons()
@@ -141,20 +143,13 @@ function addToWorldKnowledge(loc)
   world[loc:tostring()] = true
 end
 
-function showWorld()
-  --world goes from 2,2 to x-1, y-1
-  --north (face 2, z-) on top
-  --west (face 1, x-)
-  --east (face 3, x+)
-  --south (face 0, z+)
-  
-  for x=2, tx-1 do
-    for y=2, ty-1 do
-      m13.cPos(x, y)
+function calculateWorldForDisplay(worldColors, texts)
+  for y=2, ty-1 do
+    for x=2, tx-1 do
       local color = colors.gray
       local colorTxt = colors.white
       local pos = getWorldPosition(x, y)
-      local txt = " "
+      local txt = nil
       if world[pos:tostring()] then --we have knowledge of what's there
         color = colors.white
       else --we don't know
@@ -169,12 +164,13 @@ function showWorld()
         color = colors.yellow
       end
       
-      for index, data in pairs(ToMine) do
-        if data.x == pos.x and data.y == pos.y and data.z == pos.z then
-          color = colors.orange
-          break
-        end
-      end
+      -- Commented out because it really delays the refresh with big "blocks"
+      -- for index, data in pairs(ToMine) do
+      --   if data.x == pos.x and data.y == pos.y and data.z == pos.z then
+      --     color = colors.orange
+      --     break
+      --   end
+      -- end
 
       for index, tData in pairs(turtleStats) do
         if tData.position.x == pos.x and tData.position.z == pos.z then
@@ -193,11 +189,37 @@ function showWorld()
         end
       end
 
-      local preTxt, preBack = m13.setColors(colorTxt, color)
-      term.write(txt)
-      m13.setColors(preTxt, preBack)
+      local key = x..":"..y
+      worldColors[key] = color
+      if txt then 
+        texts[key] = txt
+      end
     end
   end
+end
+
+function showWorld(worldColors, texts)
+  m13.cPos(2, 2)
+  --world goes from 2,2 to x-1, y-1
+  --north (face 2, z-) on top
+  --west (face 1, x-)
+  --east (face 3, x+)
+  --south (face 0, z+)
+  for y=2, ty-1 do
+    for x=2, tx-1 do
+      m13.cPos(x, y)
+      local key = x..":"..y
+      local color = colors.gray
+      local txt = " "
+      if worldColors[key] then color = worldColors[key] end
+      if texts[key] then txt = texts[key] end
+
+      --local preTxt, preBack = m13.setColors(colorTxt, color)
+      term.setBackgroundColor(color)
+      term.write(txt)
+    end
+  end
+  term.setBackgroundColor(colors.black)
 end
 
 function showInfo()
@@ -228,7 +250,6 @@ function sendMineInfo(btnID)
   if closest < 0 then closest = findClosestTurtle(MineBlocks[1]) end
   if closest >= 0 then
     redmsg.CreateAndSend(closest, "MINE:MINE", textutils.serialize(MineBlocks))
-    JoinLists(ToMine, MineBlocks)
     MineBlocks = {}
   end
   QueueRefresh(clearTimerTimeout)
@@ -438,7 +459,7 @@ while run do
                   for y=toolData[0].y, pos.y, yStep do
                     for z=toolData[0].z, pos.z, zStep do
                       local v = vector.new(x, y, z)
-                      if not redmsg.VectorInTable(MineBlocks, v) and not redmsg.VectorInTable(ToMine, v) then
+                      if not redmsg.VectorInTable(MineBlocks, v) then
                         table.insert(MineBlocks, v)
                       end
                     end
@@ -520,10 +541,6 @@ while run do
         local blocks = textutils.unserialize(body)
         for i, pos in pairs(blocks) do
           world[vector.new(pos.x, pos.y, pos.z):tostring()] = true
-          local index = redmsg.VectorInTable(ToMine, pos)
-          if index then
-            table.remove(ToMine, index)
-          end
         end
         QueueRefresh(clearTimerTurtleTimeout)
         QueueSave(5)
