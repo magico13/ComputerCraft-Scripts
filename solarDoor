@@ -24,12 +24,20 @@ local powerSide = "top"
 local sensorSide = "back"
 local monitorSide = "right"
 
+local doorOpen = redstone.getOutput(doorSide)
+local powerActivated = redstone.getOutput(powerSide)
+
+local icSensor = sensor.wrap(sensorSide)
+local bbox = nil
+local monitor = peripheral.wrap(monitorSide)
+monitor.setTextScale(1)
+
+local lastTime = os.clock()
+local lastStored = -1
+
 function successfulEntry(user)
     userLoop(user)
 end
-
-local doorOpen = redstone.getOutput(doorSide)
-local powerActivated = redstone.getOutput(powerSide)
 
 function toggleDoor()
     doorOpen = not doorOpen
@@ -46,7 +54,7 @@ function togglePower()
 end
 
 function doorStateText(state)
-    txt = "Door "
+    local txt = "Door "
     if state then txt = txt.."Opened"
     else txt = txt.."Closed"
     end
@@ -54,7 +62,7 @@ function doorStateText(state)
 end
 
 function powerStateText(state)
-    txt = "Power "
+    local txt = "Power "
     if state then txt = txt.."Activated"
     else txt = txt.."Deactivated"
     end
@@ -74,16 +82,15 @@ function userLoop(user)
         updateMonitor(monitor, icSensor, bbox)
         pwr = getPowerDetails(icSensor, bbox)
         m13.reset()
-        --print(ySize)
         m13.printCenter(facilityName, 2)
         m13.printCenter("Logged in as: "..user, ySize-1)
         m13.printCenter(doorStateText(doorOpen), 5)
         m13.printCenter(powerStateText(powerActivated), 6)
         m13.printCenter("Stored: "..pwr.Stored.."EU".." ("..pwr.Percentage.."%)", 7)
         for i, f in pairs(funcs) do
-            txt = f
-            if i == fnSelected then txt = ">"..txt.."<" end
-            m13.printCenter(txt, listStart+i)
+            local entry = f
+            if i == fnSelected then entry = ">"..entry.."<" end
+            m13.printCenter(entry, listStart+i)
         end
         m13.makeBorder()
 
@@ -121,6 +128,20 @@ function listenForKeys(timeout)
     end
 end
 
+function listenForChars(timeout)
+    timer = os.startTimer(timeout)
+    while true do
+        local event, a1, a2, a3 = os.pullEvent()
+        if event == "char" then
+            return a1
+        elseif event == "key" then
+            if a1 == keys.backspace or a1 == keys.enter then return a1 end
+        elseif event == "timer" then
+            if a1 == timer then return nil end
+        end    
+    end
+end
+
 function findIC2BlockByName(sens, name)
     for k, v in pairs(sens.getTargets()) do
         if v.RawName == name then return k end
@@ -137,23 +158,45 @@ function getPowerDetails(sens, key)
     return newDetails
 end
 
-function updateMonitor(monitor, sens, key)
-    term.redirect(monitor)
-    m13.reset()
-    details = getPowerDetails(sens, key)
-    m13.printCenter(details.Stored.." EU", 2)
-    m13.printCenter(details.Percentage.."%", 2)
-    term.restore()
+function round(x)
+    return x>=0 and math.floor(x+0.5) or math.ceil(x-0.5)
 end
 
-local icSensor = sensor.wrap(sensorSide)
-local bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
+function updateMonitor(mon, sens, key)
+    local details = getPowerDetails(sens, key)
+    local time = os.clock()
+    local EUt = 0
+
+    term.redirect(mon)
+    m13.printCenter("Stored:", 1)
+    
+    m13.cPos(1, 2)
+    term.clearLine()
+    m13.printCenter(details.Stored, 2)
+    
+    m13.cPos(1, 3)
+    term.clearLine()
+    m13.printCenter(details.Percentage.."%", 3)
+    
+    m13.printCenter("EU/t:", 4)
+
+    m13.cPos(1,5)
+    term.clearLine()
+    if lastStored >= 0 then
+        EUt = (details.Stored - lastStored) / (time - lastTime)
+        EUt = round(EUt / 20)
+    end
+    m13.printCenter(EUt, 5)
+    term.restore()
+    lastStored = details.Stored
+    lastTime = time
+end
+
+txt = ""
+bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
 if not bbox then print("BatBox not found") return end
-
-local monitor = peripheral.wrap(monitorSide)
-monitor.setTextScale(1)
-
 while true do
+    term.setCursorBlink(true)
     updateMonitor(monitor, icSensor, bbox)
     m13.reset()
     
@@ -162,15 +205,24 @@ while true do
     m13.printCenter("Authorized Personel Only", 5)
     m13.printCenter("Please Enter your ID: ", 7)
     m13.makeBorder()
-    m13.cPos(15, 8)
 
-    txt = io.read()
-    if m13.elementInTable(accessAllowed, txt) then
-        m13.popup("Welcome "..txt.."!")
-        sleep(1)
-        successfulEntry(txt)
-    else
-        m13.popup("Access Denied")
+    m13.writeAt(txt, 15, 8)
+    c = listenForChars(1)
+    if c == keys.enter then
+        term.setCursorBlink(false)
+        if m13.elementInTable(accessAllowed, txt) then
+            m13.popup("Welcome "..txt.."!")
+            sleep(1)
+            successfulEntry(txt)
+            sleep(1)
+        else
+            m13.popup("Access Denied")
+            sleep(1)
+        end
+        txt = ""
+    elseif c == keys.backspace then
+        txt = txt:sub(1, -2)
+    elseif c ~= nil then 
+        txt = txt..c
     end
-    sleep(1)
 end
