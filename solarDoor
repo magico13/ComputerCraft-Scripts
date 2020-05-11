@@ -23,6 +23,8 @@ local doorSide = "left"
 local powerSide = "top"
 local sensorSide = "back"
 local monitorSide = "right"
+local overflowSide = "bottom"
+local overflowThreshold = 95
 
 local doorOpen = redstone.getOutput(doorSide)
 local powerActivated = redstone.getOutput(powerSide)
@@ -79,8 +81,8 @@ function userLoop(user)
     }
     local listStart = 8
     while loggedIn do
-        updateMonitor(monitor, icSensor, bbox)
         pwr = getPowerDetails(icSensor, bbox)
+        updateMonitor(monitor, pwr)
         m13.reset()
         m13.printCenter(facilityName, 2)
         m13.printCenter("Logged in as: "..user, ySize-1)
@@ -162,8 +164,15 @@ function round(x)
     return x>=0 and math.floor(x+0.5) or math.ceil(x-0.5)
 end
 
-function updateMonitor(mon, sens, key)
-    local details = getPowerDetails(sens, key)
+function handleOverflow(storedPower)
+    if storedPower > overflowThreshold then
+        redstone.setOutput(overflowSide, false) -- false enables the device
+    else
+        redstone.setOutput(overflowSide, true) -- true disables the device
+    end
+end
+
+function updateMonitor(mon, details)
     local time = os.clock()
     local EUt = 0
 
@@ -197,7 +206,9 @@ bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
 if not bbox then print("BatBox not found") return end
 while true do
     term.setCursorBlink(true)
-    updateMonitor(monitor, icSensor, bbox)
+    local details = getPowerDetails(sens, key)
+    updateMonitor(monitor, details)
+    handleOverflow(details.Percentage)
     m13.reset()
     
     m13.printCenter(facilityName, 2)
