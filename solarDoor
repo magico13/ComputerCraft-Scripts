@@ -83,6 +83,7 @@ function userLoop(user)
     while loggedIn do
         pwr = getPowerDetails(icSensor, bbox)
         updateMonitor(monitor, pwr)
+        handleOverflow(pwr.Percentage)
         m13.reset()
         m13.printCenter(facilityName, 2)
         m13.printCenter("Logged in as: "..user, ySize-1)
