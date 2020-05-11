@@ -206,7 +206,7 @@ bbox = findIC2BlockByName(icSensor, "ic2.blockbatbox")
 if not bbox then print("BatBox not found") return end
 while true do
     term.setCursorBlink(true)
-    local details = getPowerDetails(sens, key)
+    local details = getPowerDetails(icSensor, bbox)
     updateMonitor(monitor, details)
     handleOverflow(details.Percentage)
     m13.reset()
